@@ -474,23 +474,55 @@ async function getActiveDevice(retries = 3) {
 async function startPlayback(spotifyTrackId) {
   const device = await getActiveDevice();
 
-  if (!device) {
-    document.getElementById('playError').textContent =
-      'Kein Spotify-Gerät gefunden. Öffne die Spotify-App, spiele kurz etwas ab, und versuche es dann erneut.';
-    document.getElementById('playError').style.display = '';
-    return false;
-  }
+  const trackBody = { uris: ['spotify:track:' + spotifyTrackId], position_ms: 0 };
 
-  const result = await spotifyApi('/me/player/play?device_id=' + device.id, 'PUT', {
-    uris: ['spotify:track:' + spotifyTrackId],
-    position_ms: 0
-  });
-
+  // Strategie 1: Ohne device_id (Spotify wählt aktives Gerät)
+  log('Versuch 1: Play ohne device_id...', 'info');
+  let result = await spotifyApi('/me/player/play', 'PUT', trackBody);
   if (result !== null) {
-    log('Wiedergabe gestartet auf ' + device.name, 'info');
+    log('Wiedergabe gestartet (auto device)', 'info');
     document.getElementById('playError').style.display = 'none';
     return true;
   }
+
+  // Strategie 2: Mit expliziter device_id
+  if (device) {
+    log('Versuch 2: Play auf ' + device.name + '...', 'info');
+    result = await spotifyApi('/me/player/play?device_id=' + device.id, 'PUT', trackBody);
+    if (result !== null) {
+      log('Wiedergabe gestartet auf ' + device.name, 'info');
+      document.getElementById('playError').style.display = 'none';
+      return true;
+    }
+  }
+
+  // Strategie 3: Transfer playback zum Gerät, dann play
+  if (device) {
+    log('Versuch 3: Transfer + Play...', 'info');
+    const transfer = await spotifyApi('/me/player', 'PUT', {
+      device_ids: [device.id],
+      play: false
+    });
+    if (transfer !== null) {
+      await new Promise(r => setTimeout(r, 1000));
+      result = await spotifyApi('/me/player/play?device_id=' + device.id, 'PUT', trackBody);
+      if (result !== null) {
+        log('Wiedergabe gestartet nach Transfer', 'info');
+        document.getElementById('playError').style.display = 'none';
+        return true;
+      }
+    }
+  }
+
+  // Alles fehlgeschlagen
+  if (!device) {
+    document.getElementById('playError').textContent =
+      'Kein Spotify-Gerät gefunden. Öffne die Spotify-App, spiele kurz etwas ab, und versuche es dann erneut.';
+  } else {
+    document.getElementById('playError').textContent =
+      'Wiedergabe fehlgeschlagen. Öffne Spotify, spiele kurz etwas ab, und versuche es nochmal.';
+  }
+  document.getElementById('playError').style.display = '';
   return false;
 }
 
