@@ -237,6 +237,15 @@
           <div style="font-size:12px;color:rgba(255,255,255,0.55);line-height:1.35">
             H&auml;lt Spotify auf dem iPhone aktiv (stumm), damit Play beim n&auml;chsten Scan seltener scheitert.
           </div>
+
+          <div class="or-divider" style="margin-top:2px">Spoiler</div>
+          <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:rgba(255,255,255,0.85);font-weight:700">
+            <span>Song‑Info anzeigen</span>
+            <input id="songInfoToggle" type="checkbox" style="transform:scale(1.2)" onchange="setSongInfoVisible(this.checked)">
+          </label>
+          <div style="font-size:12px;color:rgba(255,255,255,0.55);line-height:1.35">
+            Blendet Titel &amp; Interpret auf dem Playing‑Screen ein (standardm&auml;&szlig;ig aus).
+          </div>
         </div>
       </details>
     </div>
@@ -259,6 +268,7 @@
       <div class="card-number" id="playingNumber">?</div>
       <div class="card-label">von 120</div>
     </div>
+    <div id="playingSongInfo" style="display:none;font-size:13px;color:rgba(255,255,255,0.9);max-width:340px;text-align:center;font-weight:800;margin-top:6px"></div>
     <div id="playingDeviceInfo" style="font-size:12px;color:var(--text-dim);max-width:340px;text-align:center"></div>
     <button id="openSpotifyPlayBtn" class="btn btn-spotify btn-small" style="display:none" onclick="openSpotifyApp()">Spotify &ouml;ffnen</button>
     <button id="openTrackBtn" class="btn btn-spotify btn-small" style="display:none" onclick="openCurrentTrack()">Song in Spotify &ouml;ffnen</button>
@@ -459,6 +469,7 @@ let debugEnabled = true;
 let lastSpotifyError = null;
 let spotifyProfile = null;
 let currentTrackSpotifyId = null;
+let currentCardNum = null;
 const LOG_KEY = 'hitster_log_v1';
 const DEBUG_KEY = 'hitster_debug_v1';
 const DEVICE_KEY = 'hitster_preferred_device_v1';
@@ -468,6 +479,8 @@ const LAST_DEVICE_NAME_KEY = 'hitster_last_device_name_v1';
 const KEEP_ALIVE_KEY = 'hitster_keep_alive_v1';
 const KEEP_ALIVE_VOL_KEY = 'hitster_keep_alive_prev_vol_v1';
 const KEEP_ALIVE_DEVICE_KEY = 'hitster_keep_alive_device_v1';
+const SONGINFO_KEY = 'hitster_songinfo_v1';
+let songInfoVisible = false;
 
 // Neutraler "Silence"-Track (nicht Teil des Spiels)
 const KEEP_ALIVE_TRACK_ID = '2bNCdW4rLnCTzgqUXTTDO1'; // John Cage – 4'33''
@@ -822,6 +835,34 @@ function setKeepAlive(enabled) {
   keepAliveEnabled = !!enabled;
   try { localStorage.setItem(KEEP_ALIVE_KEY, keepAliveEnabled ? '1' : '0'); } catch(e) {}
   log('Keep-Alive ' + (keepAliveEnabled ? 'aktiviert' : 'deaktiviert'), 'info');
+}
+
+function setSongInfoVisible(visible) {
+  songInfoVisible = !!visible;
+  try { localStorage.setItem(SONGINFO_KEY, songInfoVisible ? '1' : '0'); } catch(e) {}
+  const el = document.getElementById('playingSongInfo');
+  if (el) el.style.display = songInfoVisible ? '' : 'none';
+  updatePlayingSongInfo();
+  log('Song-Info ' + (songInfoVisible ? 'eingeblendet' : 'ausgeblendet'), 'info');
+}
+
+function updatePlayingSongInfo(song = null) {
+  const el = document.getElementById('playingSongInfo');
+  if (!el) return;
+  if (!songInfoVisible) { el.style.display = 'none'; return; }
+
+  let s = song;
+  if (!s && typeof currentCardNum === 'number') {
+    s = SONGS.find(x => x.id === currentCardNum) || null;
+  }
+  if (!s) {
+    el.textContent = '';
+    el.style.display = '';
+    return;
+  }
+  const year = s.year ? ` (${s.year})` : '';
+  el.textContent = `${s.title} — ${s.artist}${year}`;
+  el.style.display = '';
 }
 
 function openSpotifyTrack(trackId) {
@@ -1272,6 +1313,8 @@ function showHome() {
   document.getElementById('manualInput').value = '';
   const info = document.getElementById('playingDeviceInfo');
   if (info) info.textContent = '';
+  const si = document.getElementById('playingSongInfo');
+  if (si) si.textContent = '';
 }
 
 function nextCard() {
@@ -1664,10 +1707,12 @@ async function playSong(cardNum) {
   if (!song) return;
 
   log('Karte ' + cardNum + ' – starte Spotify Wiedergabe...', 'info');
+  currentCardNum = cardNum;
   document.getElementById('playingNumber').textContent = cardNum;
   document.getElementById('playError').style.display = 'none';
   currentTrackSpotifyId = song.spotify;
   showScreen('screen-playing');
+  updatePlayingSongInfo(song);
 
   const success = await startPlayback(song.spotify);
   if (success) {
@@ -1755,11 +1800,21 @@ document.addEventListener('DOMContentLoaded', () => {
     keepAliveDeviceId = localStorage.getItem(KEEP_ALIVE_DEVICE_KEY);
     const dbg = localStorage.getItem(DEBUG_KEY);
     if (dbg === '0') debugEnabled = false;
+    const si = localStorage.getItem(SONGINFO_KEY);
+    if (si === '1') songInfoVisible = true;
   } catch(e) {}
   setDebugVisible(debugEnabled);
   try {
     const t = document.getElementById('keepAliveToggle');
     if (t) t.checked = !!keepAliveEnabled;
+  } catch(e) {}
+  try {
+    const t = document.getElementById('songInfoToggle');
+    if (t) t.checked = !!songInfoVisible;
+  } catch(e) {}
+  try {
+    const el = document.getElementById('playingSongInfo');
+    if (el) el.style.display = songInfoVisible ? '' : 'none';
   } catch(e) {}
   try {
     const lm = new Date(document.lastModified);
