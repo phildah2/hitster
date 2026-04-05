@@ -463,19 +463,27 @@ function stopScanner() {
 }
 
 function onScanSuccess(decodedText) {
-  // Expected QR content: "HITSTER-01" through "HITSTER-30"
-  const match = decodedText.match(/HITSTER-(\d{1,2})/i);
-  if (match) {
-    const cardNum = parseInt(match[1]);
-    if (cardNum >= 1 && cardNum <= 30) {
-      // Stop scanner first
-      if (scanner && isScanning) {
-        scanner.stop().then(() => {
-          scanner.clear();
-          isScanning = false;
-          playSong(cardNum);
-        });
-      }
+  let cardNum = null;
+
+  // Format 1: URL like https://phildah2.github.io/hitster/?card=07
+  const urlMatch = decodedText.match(/[?&]card=(\d{1,2})/i);
+  if (urlMatch) {
+    cardNum = parseInt(urlMatch[1]);
+  }
+
+  // Format 2: Plain text like "HITSTER-07"
+  if (!cardNum) {
+    const textMatch = decodedText.match(/HITSTER-(\d{1,2})/i);
+    if (textMatch) cardNum = parseInt(textMatch[1]);
+  }
+
+  if (cardNum && cardNum >= 1 && cardNum <= 30) {
+    if (scanner && isScanning) {
+      scanner.stop().then(() => {
+        scanner.clear();
+        isScanning = false;
+        playSong(cardNum);
+      });
     }
   }
 }
