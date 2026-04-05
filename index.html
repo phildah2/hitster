@@ -793,6 +793,21 @@ function showPlayError(msg, data = null) {
   if (data) log('Play-Fehlerdetails', 'err', data);
 }
 
+function classifySpotifyPlayerError(err) {
+  if (!err) return null;
+  const status = err.status;
+  const e = err.data?.error || err.data || {};
+  const reason = String(e.reason || '').toUpperCase();
+  const msg = String(e.message || err.data?.raw || '').toLowerCase();
+
+  if (status === 404 && reason === 'NO_ACTIVE_DEVICE') return 'no_active_device';
+  if (status === 404 && msg.includes('no active device')) return 'no_active_device';
+  if (status === 404 && msg.includes('device not found')) return 'device_not_found';
+  if (status === 404 && msg.includes('not found')) return 'not_found';
+  if (status === 403) return 'forbidden';
+  return null;
+}
+
 function clearPlayError() {
   const el = document.getElementById('playError');
   el.style.display = 'none';
@@ -1073,7 +1088,16 @@ async function startPlayback(spotifyTrackId) {
   // Try to make chosen device active, then play on it
   if (chosen.id && !chosen.is_active) {
     log('Transfer zu Gerät: ' + chosen.name, 'info', { id: chosen.id });
-    await spotifyApi('/me/player', 'PUT', { device_ids: [chosen.id], play: false });
+    const tr = await spotifyApi('/me/player', 'PUT', { device_ids: [chosen.id], play: false });
+    if (tr === null) {
+      const cls = classifySpotifyPlayerError(lastSpotifyError);
+      if (cls === 'no_active_device' || cls === 'device_not_found' || cls === 'not_found') {
+        showPlayError('Spotify ist gerade inaktiv. Öffne Spotify und drücke 1× Play, dann zurück und erneut scannen.', { chosen, lastSpotifyError });
+        const b = document.getElementById('openSpotifyPlayBtn');
+        if (b) b.style.display = '';
+        return false;
+      }
+    }
     await new Promise(r => setTimeout(r, 800));
   }
 
@@ -1086,12 +1110,21 @@ async function startPlayback(spotifyTrackId) {
       const ok = await verifyPlayback(chosen, spotifyTrackId);
       return ok;
     }
+    const cls = classifySpotifyPlayerError(lastSpotifyError);
+    if (cls === 'no_active_device' || cls === 'device_not_found' || cls === 'not_found') {
+      showPlayError('Spotify ist gerade inaktiv. Öffne Spotify und drücke 1× Play, dann zurück und erneut scannen.', { chosen, lastSpotifyError });
+      const b = document.getElementById('openSpotifyPlayBtn');
+      if (b) b.style.display = '';
+      return false;
+    }
   }
 
   // Strategie 2: Ohne device_id (Spotify entscheidet)
   // Only use auto-device fallback if no preferred device is set.
   if (preferredDeviceId) {
     showPlayError('Zielgerät aktuell nicht erreichbar. Öffne Spotify auf deinem iPhone und starte kurz einen Song, dann erneut versuchen.', { chosen, lastSpotifyError });
+    const b = document.getElementById('openSpotifyPlayBtn');
+    if (b) b.style.display = '';
     return false;
   }
   log('Fallback: Play ohne device_id...', 'warn');
@@ -1103,6 +1136,13 @@ async function startPlayback(spotifyTrackId) {
   }
 
   showPlayError('Wiedergabe fehlgeschlagen. Öffne Spotify, spiele kurz etwas ab, und versuche es erneut (ggf. Gerät im Geräte-Menü auswählen).', { chosen, lastSpotifyError });
+  {
+    const cls = classifySpotifyPlayerError(lastSpotifyError);
+    if (cls === 'no_active_device' || cls === 'device_not_found' || cls === 'not_found') {
+      const b = document.getElementById('openSpotifyPlayBtn');
+      if (b) b.style.display = '';
+    }
+  }
   return false;
 }
 
@@ -1195,7 +1235,13 @@ async function stopPlayback() {
 
   if (deviceId) {
     // Set volume 0 on the device, then play silent track
-    await spotifyApi('/me/player/volume?volume_percent=0&device_id=' + encodeURIComponent(deviceId), 'PUT');
+    const v = await spotifyApi('/me/player/volume?volume_percent=0&device_id=' + encodeURIComponent(deviceId), 'PUT');
+    if (v === null) {
+      const cls = classifySpotifyPlayerError(lastSpotifyError);
+      if (cls === 'no_active_device' || cls === 'device_not_found' || cls === 'not_found') {
+        log('Keep-Alive: Spotify inaktiv – öffne Spotify empfohlen', 'warn', { lastSpotifyError });
+      }
+    }
     const ok = await spotifyApi('/me/player/play?device_id=' + encodeURIComponent(deviceId), 'PUT', { uris: ['spotify:track:' + KEEP_ALIVE_TRACK_ID], position_ms: 0 });
     if (ok !== null) {
       keepAliveArmed = true;
@@ -1245,6 +1291,17 @@ function openSpotifyApp() {
   let didHide = false;
   const onVis = () => { if (document.visibilityState === 'hidden') didHide = true; };
   document.addEventListener('visibilitychange', onVis, { once: true });
+
+  // When user comes back from Spotify, refresh devices once.
+  const onBack = () => {
+    if (document.visibilityState === 'visible') {
+      try { document.removeEventListener('visibilitychange', onBack); } catch {}
+      log('Zurück aus Spotify – aktualisiere Geräte', 'info');
+      refreshDevices(1);
+    }
+  };
+  document.addEventListener('visibilitychange', onBack);
+  setTimeout(() => { try { document.removeEventListener('visibilitychange', onBack); } catch {} }, 15000);
 
   try {
     window.location.href = deepLink;
@@ -1306,6 +1363,18 @@ function updateSpotifyStatus(devices = null) {
     wakeBtn.style.display = 'none';
     sel.style.display = 'none';
     refreshBtn.style.display = 'none';
+    return;
+  }
+
+  // If the last player command failed with "no active device"/"device not found", treat as inactive even if /devices is stale.
+  const lastCls = classifySpotifyPlayerError(lastSpotifyError);
+  if ((lastCls === 'no_active_device' || lastCls === 'device_not_found' || lastCls === 'not_found') &&
+      String(lastSpotifyError?.endpoint || '').includes('/me/player')) {
+    statusValue.textContent = 'Inaktiv (Spotify Connect)';
+    hint.textContent = 'Öffne Spotify, drücke 1× Play, dann zurück und scannen.';
+    wakeBtn.style.display = '';
+    sel.style.display = 'none';
+    refreshBtn.style.display = '';
     return;
   }
 
