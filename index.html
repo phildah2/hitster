@@ -71,6 +71,7 @@
   .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
   .btn-secondary { background: var(--card-bg); color: var(--text); border: 2px solid rgba(255,255,255,0.1); }
   .btn-spotify { background: #1DB954; color: white; }
+  .btn-danger { background: rgba(233,69,96,0.18); color: white; border: 2px solid rgba(233,69,96,0.55); }
   .btn-small { padding: 10px 20px; font-size: 14px; border-radius: 10px; }
 
   #qr-reader { width: 100%; max-width: 320px; border-radius: 16px; overflow: hidden; background: #000; }
@@ -112,6 +113,31 @@
   .spotify-badge {
     display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
     background: rgba(29,185,84,0.15); border-radius: 20px; font-size: 12px; color: #1DB954;
+  }
+  .spotify-badge.inactive { background: rgba(233,69,96,0.12); color: rgba(255,255,255,0.85); }
+
+  .status-card {
+    width: 100%; max-width: 360px;
+    background: rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 12px 14px;
+    text-align: left;
+  }
+  .status-row { display:flex; align-items:center; justify-content:space-between; gap: 10px; }
+  .status-title { font-size: 12px; color: rgba(255,255,255,0.65); font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .status-value { font-size: 14px; font-weight: 700; }
+  .status-hint { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 6px; line-height: 1.35; }
+  .device-select {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.35);
+    color: var(--text);
+    font-weight: 700;
+    outline: none;
   }
 
   .setup-box {
@@ -158,10 +184,23 @@
 
   <!-- HOME: Bereit zum Scannen -->
   <div id="screen-home" class="screen">
-    <div class="spotify-badge" id="spotifyUserBadge">&#9679; Spotify verbunden</div>
+    <div class="spotify-badge" id="spotifyUserBadge">&#9679; Spotify</div>
     <div class="home-icon">&#127925;</div>
     <div class="home-text">Tippe auf „N&auml;chste Karte“ und scanne den QR-Code.</div>
     <button class="btn btn-primary" onclick="startScanner()">&#128247; N&auml;chste Karte</button>
+
+    <div class="status-card" id="spotifyStatusCard">
+      <div class="status-row">
+        <div>
+          <div class="status-title">Spotify Status</div>
+          <div class="status-value" id="spotifyStatusValue">Pr&uuml;fe…</div>
+        </div>
+        <button class="btn btn-spotify btn-small" id="spotifyWakeBtn" style="display:none;max-width:160px" onclick="openSpotifyApp()">Spotify &ouml;ffnen</button>
+      </div>
+      <div class="status-hint" id="spotifyStatusHint"></div>
+      <select class="device-select" id="deviceSelect" style="display:none" onchange="onDeviceSelectChange()"></select>
+      <button class="btn btn-secondary btn-small" id="deviceRefreshBtn" style="display:none;margin-top:10px" onclick="refreshDevices(1)">Ger&auml;te neu laden</button>
+    </div>
 
     <div class="more-panel">
       <details class="more">
@@ -176,7 +215,7 @@
             <button class="btn btn-secondary btn-small" onclick="playManual()">&#9654; Play</button>
           </div>
 
-          <button class="btn btn-secondary btn-small" onclick="openDevicePanel()">&#128266; Spotify-Ger&auml;te</button>
+          <button class="btn btn-secondary btn-small" onclick="openDevicePanel()">&#128266; Spotify-Ger&auml;te (Details)</button>
 
           <div class="or-divider" style="margin-top:2px">Debug</div>
           <div style="display:flex;gap:10px;width:100%;justify-content:center">
@@ -217,10 +256,9 @@
     <div id="playError" class="error-msg" style="display:none"></div>
     <button class="btn btn-primary" onclick="nextCard()" style="margin-top:8px">&#127912; N&auml;chste Karte</button>
     <div style="display:flex;gap:10px;width:100%;max-width:300px;justify-content:center">
-      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="openDevicePanel()">&#128266; Ger&auml;te</button>
       <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="showSongList()">&#128065; Songs</button>
+      <button class="btn btn-small btn-danger" style="max-width:145px" onclick="stopPlayback()">&#9724; Stopp</button>
     </div>
-    <button class="btn btn-small subtle-link-btn" onclick="stopPlayback()">&#9724; Stopp</button>
     <div class="debug-log" id="debugLogPlay"></div>
   </div>
 
@@ -753,7 +791,14 @@ function pickBestDevice(devices) {
   const list = Array.isArray(devices) ? devices.filter(Boolean) : [];
   if (!list.length) return null;
 
-  // Prefer active non-web-player devices (usually the phone)
+  // Prefer active iPhone / smartphone
+  const activeIphone = list.find(d => d.is_active && /iphone/i.test(d.name));
+  if (activeIphone) return activeIphone;
+
+  const activePhone = list.find(d => d.is_active && String(d.type || '').toLowerCase().includes('smartphone'));
+  if (activePhone) return activePhone;
+
+  // Prefer active non-web-player devices
   const activeNonWeb = list.find(d => d.is_active && !isWebPlayerDevice(d));
   if (activeNonWeb) return activeNonWeb;
 
@@ -951,19 +996,19 @@ function nextCard() {
 }
 
 function openSpotifyApp() {
-  // iOS: opening https://open.spotify.com often "bounces" to the app and back to the browser.
-  // We therefore try a deep link first and only fall back to the web player if the app did not open.
-  log('Öffne Spotify-App...', 'info');
+  // Goal: make Spotify Connect "active" again on iOS.
+  // Opening open.spotify.com often bounces back to the browser; deep links are less annoying.
+  // We open a neutral, non-game context where the user can tap Play once.
+  const deepLink = 'spotify:search:one%20second%20silence';
+  log('Öffne Spotify (Suche: one second silence)...', 'info', { deepLink });
 
   let didHide = false;
   const onVis = () => { if (document.visibilityState === 'hidden') didHide = true; };
   document.addEventListener('visibilitychange', onVis, { once: true });
 
-  // Try deep link (works when app is installed)
   try {
-    // Use a URI that reliably opens the app without forcing a browser tab.
-    window.location.href = 'spotify:app';
-  } catch(e) {
+    window.location.href = deepLink;
+  } catch (e) {
     log('Deep-Link fehlgeschlagen', 'warn', { message: String(e?.message || e) });
   }
 
@@ -975,7 +1020,7 @@ function openSpotifyApp() {
       return;
     }
     log('Spotify-App nicht geöffnet, nutze Web-Fallback...', 'warn');
-    try { window.open('https://open.spotify.com', '_blank'); } catch(e) {}
+    try { window.open('https://open.spotify.com/search/one%20second%20silence', '_blank'); } catch(e) {}
   }, 1500);
 }
 
@@ -984,6 +1029,85 @@ function openDevicePanel() {
   document.getElementById('debugLogDevices').innerHTML = '';
   showScreen('screen-devices');
   refreshDevices();
+}
+
+function updateSpotifyStatus(devices = null) {
+  const statusValue = document.getElementById('spotifyStatusValue');
+  const hint = document.getElementById('spotifyStatusHint');
+  const wakeBtn = document.getElementById('spotifyWakeBtn');
+  const sel = document.getElementById('deviceSelect');
+  const refreshBtn = document.getElementById('deviceRefreshBtn');
+  if (!statusValue || !hint || !wakeBtn || !sel || !refreshBtn) return;
+
+  if (!spotifyToken) {
+    statusValue.textContent = 'Nicht verbunden';
+    hint.textContent = 'Verbinde Spotify in den Optionen.';
+    wakeBtn.style.display = 'none';
+    sel.style.display = 'none';
+    refreshBtn.style.display = 'none';
+    return;
+  }
+
+  const list = Array.isArray(devices) ? devices : [];
+  const active = list.filter(d => d && d.is_active);
+
+  if (active.length === 0) {
+    statusValue.textContent = 'Inaktiv (kein aktives Gerät)';
+    hint.textContent = 'Öffne Spotify, starte kurz irgendeinen Song, dann scannen.';
+    wakeBtn.style.display = '';
+    sel.style.display = 'none';
+    refreshBtn.style.display = '';
+    return;
+  }
+
+  wakeBtn.style.display = 'none';
+  refreshBtn.style.display = '';
+
+  if (active.length === 1) {
+    statusValue.textContent = 'Aktiv: ' + active[0].name;
+    hint.textContent = 'Bereit zum Scannen.';
+    sel.style.display = 'none';
+
+    // If user did not pick anything, remember the active phone as last-good
+    if (!preferredDeviceId && active[0].id && !isWebPlayerDevice(active[0])) {
+      lastGoodDeviceId = active[0].id;
+      lastGoodDeviceName = active[0].name;
+      try {
+        localStorage.setItem(LAST_DEVICE_KEY, lastGoodDeviceId);
+        localStorage.setItem(LAST_DEVICE_NAME_KEY, lastGoodDeviceName);
+      } catch(e) {}
+    }
+    return;
+  }
+
+  // Multiple active devices: show dropdown
+  statusValue.textContent = 'Mehrere aktive Geräte';
+  hint.textContent = 'Wähle, wo abgespielt werden soll.';
+  sel.style.display = '';
+  sel.innerHTML = active.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+
+  // Keep selection stable: preferred device wins, else current active[0]
+  const target = preferredDeviceId && active.some(d => d.id === preferredDeviceId) ? preferredDeviceId : active[0].id;
+  sel.value = target;
+  preferredDeviceId = target;
+  preferredDeviceName = active.find(d => d.id === target)?.name || preferredDeviceName;
+  try {
+    localStorage.setItem(DEVICE_KEY, preferredDeviceId);
+    if (preferredDeviceName) localStorage.setItem(DEVICE_NAME_KEY, preferredDeviceName);
+  } catch(e) {}
+  updateSpotifyBadge();
+}
+
+function onDeviceSelectChange() {
+  const sel = document.getElementById('deviceSelect');
+  if (!sel) return;
+  const id = sel.value;
+  if (!id) return;
+  // Name will be refreshed on next devices fetch; store id immediately
+  preferredDeviceId = id;
+  try { localStorage.setItem(DEVICE_KEY, preferredDeviceId); } catch(e) {}
+  log('Aktives Zielgerät gewählt', 'info', { preferredDeviceId });
+  updateSpotifyBadge();
 }
 
 function clearPreferredDevice() {
@@ -1018,6 +1142,7 @@ function updateSpotifyBadge() {
   if (!spotifyToken) {
     el.innerHTML = '&#9679; Spotify nicht verbunden';
     el.style.color = 'var(--text-dim)';
+    el.classList.add('inactive');
     return;
   }
   let deviceTxt = '';
@@ -1027,6 +1152,7 @@ function updateSpotifyBadge() {
   }
   el.innerHTML = '&#9679; Spotify verbunden' + deviceTxt;
   el.style.color = '#1DB954';
+  el.classList.remove('inactive');
 }
 
 function renderDevices(devices) {
@@ -1068,6 +1194,7 @@ async function refreshDevices(retries = 2) {
   const devices = await getDevices(retries);
   renderDevices(devices);
   updateSpotifyBadge();
+  updateSpotifyStatus(devices);
 }
 
 // ══════════════════════════════════════════════
@@ -1271,6 +1398,8 @@ async function init() {
       }
 
       showScreen('screen-home');
+      // Initial status refresh in background
+      refreshDevices(1);
       return;
     }
   } catch(e) {}
