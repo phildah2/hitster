@@ -78,16 +78,11 @@
   .pulse-dot { width: 12px; height: 12px; background: var(--success); border-radius: 50%; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
 
-  /* Spotify Embed - hidden but audible */
+  /* Spotify Embed - off-screen but audible */
   #spotify-embed-container {
-    position: fixed; bottom: -200px; left: 0; width: 300px; height: 80px;
-    opacity: 0; pointer-events: none;
-  }
-  #spotify-embed-container.debug-visible {
-    position: relative; bottom: auto; left: auto;
-    opacity: 1; pointer-events: auto;
-    width: 100%; max-width: 300px; height: 80px;
-    border-radius: 12px; overflow: hidden;
+    position: fixed; left: -9999px; top: -9999px;
+    width: 300px; height: 152px;
+    pointer-events: none;
   }
 
   /* Debug Log */
@@ -148,10 +143,8 @@
       <div class="card-label">von 30</div>
     </div>
     <div class="playing-status"><div class="pulse-dot"></div> Wird abgespielt...</div>
-    <div id="spotify-embed-container"></div>
     <div style="font-size:13px;color:var(--text-dim);padding:8px 16px">
-      &#128266; Musik l&auml;uft direkt hier - Spotify bleibt im Hintergrund!<br>
-      Dr&uuml;cke Play im eingebetteten Player falls n&ouml;tig.
+      &#128266; Song wird in Spotify abgespielt.
     </div>
     <button class="btn btn-primary" onclick="showHome()">&#127912; N&auml;chste Karte</button>
     <button class="btn btn-small" style="background:none;color:var(--text-dim)" onclick="showSongList()">
@@ -169,6 +162,18 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
+// ── YOUTUBE ID → CARD NUMBER (fuer alte Karten) ──
+const YT_MAP = {
+  "60ItHLz5WEA":1, "pXRviuL6vMY":2, "nYh-n7EOtMA":3, "JGwWNGJdvx8":4,
+  "kJQP7kiw5Fk":5, "FM7MFYoylVs":6, "BQ0mxQXmLsk":7, "W9P_qUnMaFg":8,
+  "bo_efYhYU2A":9, "uSbxCX2LVps":10, "q0hyYWKXF0Q":11, "Pkh8UtuejGw":12,
+  "DyDfgMOUjCI":13, "r7qovpFAGrQ":14, "4NRXx6U8ABQ":15, "E07s5ZYygMg":16,
+  "Fo3DAhiNKQo":17, "gUci-tsiU4I":18, "qP-7GNoDJ5c":19, "kTJczUoc26U":20,
+  "Il0S8BoucSA":21, "TUVcZfQe-Kw":22, "H5v3kku4y6Q":23, "mRD0-GxqHVo":24,
+  "WcIcVapfqXw":25, "G7KNmW9a75Y":26, "0nYDnTTJgFI":27, "OiC1rgCPmUQ":28,
+  "eVli-tstM5E":29, "kPa7bsKwL-c":30,
+};
+
 // ── SONGS ──
 const SONGS = [
   { id:1,  year:2016, title:"Faded",                    artist:"Alan Walker",                     spotify:"698ItKASDavgwZ3WjaWjtz" },
@@ -297,7 +302,22 @@ function onScanSuccess(decodedText) {
     }
   }
 
-  // Format 3: Nur eine Zahl
+  // Format 3: YouTube URL (alte Karten)
+  if (!cardNum) {
+    const ytMatch = decodedText.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    if (ytMatch) {
+      const ytId = ytMatch[1];
+      log('YouTube-URL erkannt, ID: ' + ytId, 'info');
+      if (YT_MAP[ytId]) {
+        cardNum = YT_MAP[ytId];
+        log('YouTube-ID zugeordnet zu Karte: ' + cardNum, 'info');
+      } else {
+        log('YouTube-ID nicht in Datenbank!', 'err');
+      }
+    }
+  }
+
+  // Format 4: Nur eine Zahl
   if (!cardNum) {
     const numOnly = parseInt(decodedText.trim());
     if (numOnly >= 1 && numOnly <= 30) {
@@ -357,23 +377,18 @@ function playSong(cardNum) {
     return;
   }
 
-  log('Lade Spotify-Embed fuer: Karte ' + cardNum, 'info');
+  log('Starte Karte ' + cardNum + ' via Spotify...', 'info');
 
   // Update playing screen
   document.getElementById('playingNumber').textContent = cardNum;
   showScreen('screen-playing');
 
-  // Spotify Embed Player (spielt direkt in der Web-App!)
-  const container = document.getElementById('spotify-embed-container');
-  container.className = 'debug-visible';
-  container.innerHTML = `<iframe
-    src="https://open.spotify.com/embed/track/${song.spotify}?utm_source=generator&theme=0"
-    width="100%" height="80" frameBorder="0"
-    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-    loading="eager"
-    style="border-radius:12px"></iframe>`;
+  // Spotify URI öffnet die Spotify-App und spielt automatisch ab
+  const spotifyUri = `spotify:track:${song.spotify}`;
+  log('Oeffne Spotify URI: ' + spotifyUri, 'info');
+  window.location.href = spotifyUri;
 
-  log('Spotify-Embed geladen. Druecke Play im Player!', 'info');
+  log('Spotify sollte jetzt abspielen. Handy umdrehen!', 'info');
 }
 
 // ── URL PARAMETER ──
