@@ -47,6 +47,7 @@
   .btn:active { transform: scale(0.96); }
   .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
   .btn-secondary { background: var(--card-bg); color: var(--text); border: 2px solid rgba(255,255,255,0.1); }
+  .btn-spotify { background: #1DB954; color: white; }
   .btn-small { padding: 10px 20px; font-size: 14px; border-radius: 10px; }
 
   #qr-reader { width: 100%; max-width: 320px; border-radius: 16px; overflow: hidden; background: #000; }
@@ -71,27 +72,37 @@
   }
   .playing-card .card-number { font-size: 64px; font-weight: 800; color: var(--accent); line-height: 1; }
   .playing-card .card-label { font-size: 15px; color: var(--text-dim); margin-top: 6px; }
-  .playing-status { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--success); font-weight: 600; }
+  .playing-status { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 15px; color: var(--success); font-weight: 600; }
   .pulse-dot { width: 12px; height: 12px; background: var(--success); border-radius: 50%; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
-
-  /* Spacer pushes embed below visible area */
-  .scroll-spacer { height: 60vh; flex-shrink: 0; }
-  .embed-area {
-    width: 100%; max-width: 320px; border-radius: 12px; overflow: hidden;
-    opacity: 0.3;
-  }
-  .embed-label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
 
   .debug-log {
     background: #000; border: 1px solid #333; border-radius: 10px;
     padding: 10px; width: 100%; max-width: 380px;
     font-family: monospace; font-size: 11px; color: #0f0;
-    max-height: 100px; overflow-y: auto; text-align: left; word-break: break-all;
+    max-height: 120px; overflow-y: auto; text-align: left; word-break: break-all;
   }
   .debug-log .err { color: #f55; }
   .debug-log .warn { color: #fa0; }
   .debug-log .info { color: #0af; }
+
+  .spotify-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    background: rgba(29,185,84,0.15); border-radius: 20px; font-size: 12px; color: #1DB954;
+  }
+
+  .setup-box {
+    background: var(--bg2); border-radius: 16px; padding: 20px; width: 100%;
+    text-align: left; font-size: 14px; line-height: 1.6;
+  }
+  .setup-box h3 { color: var(--accent); margin-bottom: 8px; font-size: 16px; }
+  .setup-box code { background: #000; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  .setup-box ol { padding-left: 20px; }
+  .setup-box li { margin-bottom: 6px; }
+  .setup-box input {
+    width: 100%; padding: 10px; margin-top: 8px; border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 8px; background: #000; color: var(--text); font-family: monospace; font-size: 14px;
+  }
 
   .song-grid { display: grid; grid-template-columns: 1fr; gap: 6px; width: 100%; max-height: 55vh; overflow-y: auto; }
   .song-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg2); border-radius: 8px; font-size: 13px; text-align: left; }
@@ -99,18 +110,41 @@
   .song-item .song-title { font-weight: 600; }
   .song-item .song-artist { color: var(--text-dim); font-size: 11px; }
   .song-item .song-year { font-weight: 700; color: var(--accent); font-size: 13px; }
+
+  .error-msg { color: var(--accent); font-size: 13px; padding: 8px; background: rgba(233,69,96,0.1); border-radius: 8px; }
 </style>
 </head>
 <body>
 
 <div class="header">
   <h1>HITSTER<span>+</span></h1>
-  <div class="subtitle">Erweiterungsset - 30 Karten</div>
+  <div class="subtitle">Erweiterungsset &middot; 30 Karten</div>
 </div>
 
 <div class="content">
-  <!-- HOME -->
-  <div id="screen-home" class="screen active">
+
+  <!-- SETUP: Spotify App einrichten -->
+  <div id="screen-setup" class="screen">
+    <div class="home-icon" style="font-size:36px">&#127925;</div>
+    <div class="setup-box">
+      <h3>Spotify verbinden (einmalig)</h3>
+      <ol>
+        <li>&#214;ffne <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--accent)">developer.spotify.com/dashboard</a></li>
+        <li>Erstelle eine neue App (Name: <code>Hitster+</code>)</li>
+        <li>Redirect URI: <code>https://phildah2.github.io/hitster/</code></li>
+        <li>Bei &quot;Which API/SDKs are you planning to use?&quot; w&auml;hle <b>Web API</b></li>
+        <li>Kopiere die <b>Client ID</b> und f&uuml;ge sie hier ein:</li>
+      </ol>
+      <input type="text" id="clientIdInput" placeholder="Client ID eingeben..." autocomplete="off">
+    </div>
+    <button class="btn btn-spotify" onclick="saveClientIdAndLogin()">&#9654; Mit Spotify verbinden</button>
+    <div id="setupError" class="error-msg" style="display:none"></div>
+    <div class="debug-log" id="debugLogSetup"></div>
+  </div>
+
+  <!-- HOME: Bereit zum Scannen -->
+  <div id="screen-home" class="screen">
+    <div class="spotify-badge" id="spotifyUserBadge">&#9679; Spotify verbunden</div>
     <div class="home-icon">&#127925;</div>
     <div class="home-text">Scanne den QR-Code oder gib die Kartennummer ein.</div>
     <button class="btn btn-primary" onclick="startScanner()">&#128247; QR-Code scannen</button>
@@ -119,7 +153,10 @@
       <input type="number" id="manualInput" min="1" max="30" placeholder="Nr." inputmode="numeric">
       <button class="btn btn-secondary btn-small" onclick="playManual()">&#9654; Play</button>
     </div>
-    <div class="debug-log" id="debugLog"><span class="info">App bereit.</span></div>
+    <button class="btn btn-small" style="background:none;color:var(--text-dim);margin-top:8px" onclick="spotifyLogout()">
+      Spotify trennen
+    </button>
+    <div class="debug-log" id="debugLog"></div>
   </div>
 
   <!-- SCAN -->
@@ -137,19 +174,16 @@
       <div class="card-number" id="playingNumber">?</div>
       <div class="card-label">von 30</div>
     </div>
-    <button class="btn btn-primary" id="scrollToPlayerBtn" onclick="scrollToPlayer()" style="font-size:20px;padding:18px 28px">
-      &#9654; Musik starten
+    <div class="playing-status"><div class="pulse-dot"></div> Wird abgespielt...</div>
+    <div id="playError" class="error-msg" style="display:none"></div>
+    <button class="btn btn-primary" onclick="showHome()" style="margin-top:8px">&#127912; N&auml;chste Karte</button>
+    <button class="btn btn-small" style="background:none;color:var(--text-dim)" onclick="stopPlayback()">
+      &#9724; Stopp
     </button>
-    <div class="playing-status" id="playingStatusHint" style="display:none"><div class="pulse-dot"></div> Wird abgespielt...</div>
-    <button class="btn btn-primary" onclick="showHome()" style="margin-top:4px">&#127912; N&auml;chste Karte</button>
     <button class="btn btn-small" style="background:none;color:var(--text-dim)" onclick="showSongList()">
       &#128065; Alle Songs (Spoiler!)
     </button>
-    <!-- Spacer to push embed out of view -->
-    <div class="scroll-spacer"></div>
-    <div class="embed-label">&#9660; Druecke Play im Spotify-Player:</div>
-    <div class="embed-area" id="spotify-embed-container" style="opacity:1"></div>
-    <div style="height:30vh"></div>
+    <div class="debug-log" id="debugLogPlay"></div>
   </div>
 
   <!-- SONG LIST -->
@@ -162,6 +196,9 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
+// ══════════════════════════════════════════════
+// SONGS – Spotify Track IDs
+// ══════════════════════════════════════════════
 const SONGS = [
   { id:1,  year:2016, title:"Faded",                    artist:"Alan Walker",                     spotify:"698ItKASDavgwZ3WjaWjtz" },
   { id:2,  year:2016, title:"Stressed Out",             artist:"Twenty One Pilots",               spotify:"3CRDbSIZ4r5MsZ0YwxuEkn" },
@@ -195,24 +232,286 @@ const SONGS = [
   { id:30, year:2024, title:"Die With A Smile",         artist:"Lady Gaga & Bruno Mars",          spotify:"2plbrEY59IikOBgBGLjaoe" },
 ];
 
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
 let scanner = null;
 let isScanning = false;
 let scanProcessing = false;
+let spotifyToken = null;
+let spotifyClientId = null;
+const REDIRECT_URI = window.location.origin + window.location.pathname;
+const SCOPES = 'user-modify-playback-state user-read-playback-state';
 
+// ══════════════════════════════════════════════
+// DEBUG LOG
+// ══════════════════════════════════════════════
 function log(msg, type = '') {
   const line = `<div class="${type}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
-  ['debugLog','debugLogScan'].forEach(id => {
+  ['debugLog','debugLogScan','debugLogSetup','debugLogPlay'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.innerHTML += line; el.scrollTop = el.scrollHeight; }
   });
 }
 
+// ══════════════════════════════════════════════
+// SPOTIFY PKCE OAuth
+// ══════════════════════════════════════════════
+function generateRandomString(length) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  let result = '';
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  for (let i = 0; i < length; i++) result += chars[arr[i] % chars.length];
+  return result;
+}
+
+async function sha256(plain) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return await crypto.subtle.digest('SHA-256', data);
+}
+
+function base64urlencode(buffer) {
+  let str = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) str += String.fromCharCode(bytes[i]);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function startSpotifyLogin(clientId) {
+  spotifyClientId = clientId;
+  // Save client ID for after redirect
+  try { sessionStorage.setItem('hitster_client_id', clientId); } catch(e) {}
+
+  const codeVerifier = generateRandomString(64);
+  try { sessionStorage.setItem('hitster_code_verifier', codeVerifier); } catch(e) {}
+
+  const hashed = await sha256(codeVerifier);
+  const codeChallenge = base64urlencode(hashed);
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    scope: SCOPES,
+    redirect_uri: REDIRECT_URI,
+    code_challenge_method: 'S256',
+    code_challenge: codeChallenge,
+  });
+
+  log('Weiterleitung zu Spotify Login...', 'info');
+  window.location.href = 'https://accounts.spotify.com/authorize?' + params.toString();
+}
+
+async function handleSpotifyCallback(code) {
+  let clientId, codeVerifier;
+  try {
+    clientId = sessionStorage.getItem('hitster_client_id');
+    codeVerifier = sessionStorage.getItem('hitster_code_verifier');
+  } catch(e) {}
+
+  if (!clientId || !codeVerifier) {
+    log('Session-Daten verloren. Bitte erneut verbinden.', 'err');
+    showScreen('screen-setup');
+    return;
+  }
+
+  log('Tausche Auth-Code gegen Token...', 'info');
+
+  try {
+    const resp = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: REDIRECT_URI,
+        client_id: clientId,
+        code_verifier: codeVerifier,
+      }),
+    });
+
+    const data = await resp.json();
+
+    if (data.access_token) {
+      spotifyToken = data.access_token;
+      spotifyClientId = clientId;
+      log('Spotify Token erhalten!', 'info');
+
+      // Save refresh token
+      try {
+        sessionStorage.setItem('hitster_token', data.access_token);
+        if (data.refresh_token) sessionStorage.setItem('hitster_refresh', data.refresh_token);
+      } catch(e) {}
+
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+
+      // Check for pending card play
+      const pendingCard = sessionStorage.getItem('hitster_pending_card');
+      if (pendingCard) {
+        sessionStorage.removeItem('hitster_pending_card');
+        showScreen('screen-home');
+        log('Spiele ausstehende Karte ' + pendingCard, 'info');
+        playSong(parseInt(pendingCard));
+      } else {
+        showScreen('screen-home');
+      }
+    } else {
+      log('Token-Fehler: ' + JSON.stringify(data), 'err');
+      showScreen('screen-setup');
+    }
+  } catch(e) {
+    log('Netzwerkfehler: ' + e.message, 'err');
+    showScreen('screen-setup');
+  }
+}
+
+async function refreshToken() {
+  let refreshTok, clientId;
+  try {
+    refreshTok = sessionStorage.getItem('hitster_refresh');
+    clientId = sessionStorage.getItem('hitster_client_id');
+  } catch(e) { return false; }
+
+  if (!refreshTok || !clientId) return false;
+
+  try {
+    const resp = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshTok,
+        client_id: clientId,
+      }),
+    });
+    const data = await resp.json();
+    if (data.access_token) {
+      spotifyToken = data.access_token;
+      try {
+        sessionStorage.setItem('hitster_token', data.access_token);
+        if (data.refresh_token) sessionStorage.setItem('hitster_refresh', data.refresh_token);
+      } catch(e) {}
+      log('Token erneuert', 'info');
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+function saveClientIdAndLogin() {
+  const input = document.getElementById('clientIdInput');
+  const clientId = input.value.trim();
+  if (!clientId || clientId.length < 10) {
+    document.getElementById('setupError').textContent = 'Bitte gültige Client ID eingeben.';
+    document.getElementById('setupError').style.display = '';
+    return;
+  }
+  startSpotifyLogin(clientId);
+}
+
+function spotifyLogout() {
+  spotifyToken = null;
+  try {
+    sessionStorage.removeItem('hitster_token');
+    sessionStorage.removeItem('hitster_refresh');
+    sessionStorage.removeItem('hitster_client_id');
+  } catch(e) {}
+  showScreen('screen-setup');
+}
+
+// ══════════════════════════════════════════════
+// SPOTIFY PLAYBACK CONTROL (Connect API)
+// ══════════════════════════════════════════════
+async function spotifyApi(endpoint, method = 'GET', body = null) {
+  if (!spotifyToken) { log('Kein Token', 'err'); return null; }
+
+  const opts = {
+    method,
+    headers: { 'Authorization': 'Bearer ' + spotifyToken },
+  };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+
+  let resp = await fetch('https://api.spotify.com/v1' + endpoint, opts);
+
+  // Token expired? Try refresh
+  if (resp.status === 401) {
+    log('Token abgelaufen, erneuere...', 'warn');
+    const refreshed = await refreshToken();
+    if (refreshed) {
+      opts.headers['Authorization'] = 'Bearer ' + spotifyToken;
+      resp = await fetch('https://api.spotify.com/v1' + endpoint, opts);
+    } else {
+      log('Token-Erneuerung fehlgeschlagen. Bitte neu verbinden.', 'err');
+      spotifyLogout();
+      return null;
+    }
+  }
+
+  if (resp.status === 204) return {}; // No content = success for PUT
+  if (!resp.ok) {
+    const errData = await resp.json().catch(() => ({}));
+    log('API Fehler ' + resp.status + ': ' + JSON.stringify(errData), 'err');
+    return null;
+  }
+  return await resp.json().catch(() => ({}));
+}
+
+async function getActiveDevice() {
+  const data = await spotifyApi('/me/player/devices');
+  if (!data || !data.devices || data.devices.length === 0) {
+    log('Keine Spotify-Geräte gefunden. Öffne Spotify auf deinem Handy.', 'warn');
+    return null;
+  }
+  // Prefer active device, otherwise first one
+  const active = data.devices.find(d => d.is_active);
+  const device = active || data.devices[0];
+  log('Gerät: ' + device.name + ' (' + device.type + ')', 'info');
+  return device;
+}
+
+async function startPlayback(spotifyTrackId) {
+  const device = await getActiveDevice();
+
+  if (!device) {
+    document.getElementById('playError').textContent =
+      'Kein aktives Spotify-Gerät gefunden. Öffne die Spotify-App auf deinem Handy und spiele kurz irgendetwas ab, dann versuche es erneut.';
+    document.getElementById('playError').style.display = '';
+    return false;
+  }
+
+  const result = await spotifyApi('/me/player/play?device_id=' + device.id, 'PUT', {
+    uris: ['spotify:track:' + spotifyTrackId],
+    position_ms: 0
+  });
+
+  if (result !== null) {
+    log('Wiedergabe gestartet auf ' + device.name, 'info');
+    document.getElementById('playError').style.display = 'none';
+    return true;
+  }
+  return false;
+}
+
+async function stopPlayback() {
+  await spotifyApi('/me/player/pause', 'PUT');
+  log('Wiedergabe pausiert', 'info');
+  showHome();
+}
+
+// ══════════════════════════════════════════════
+// SCREEN MANAGEMENT
+// ══════════════════════════════════════════════
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  // Scroll to top when switching screens
   window.scrollTo(0, 0);
 }
+
 function showHome() {
   if (isScanning) stopScanner();
   scanProcessing = false;
@@ -220,7 +519,9 @@ function showHome() {
   document.getElementById('manualInput').value = '';
 }
 
-// ── QR SCANNER ──
+// ══════════════════════════════════════════════
+// QR SCANNER
+// ══════════════════════════════════════════════
 function startScanner() {
   showScreen('screen-scan');
   document.getElementById('debugLogScan').innerHTML = '';
@@ -258,20 +559,14 @@ function onScanSuccess(decodedText) {
   scanProcessing = true;
   let cardNum = null;
 
-  // Format 1: URL mit ?card=XX
   const urlMatch = decodedText.match(/[?&]card=(\d{1,2})/i);
-  if (urlMatch) {
-    cardNum = parseInt(urlMatch[1]);
-    log('URL-Format -> Karte ' + cardNum, 'info');
-  }
+  if (urlMatch) { cardNum = parseInt(urlMatch[1]); log('URL -> Karte ' + cardNum, 'info'); }
 
-  // Format 2: HITSTER-XX
   if (!cardNum) {
     const textMatch = decodedText.match(/HITSTER-?(\d{1,2})/i);
-    if (textMatch) { cardNum = parseInt(textMatch[1]); log('HITSTER-Format -> Karte ' + cardNum, 'info'); }
+    if (textMatch) { cardNum = parseInt(textMatch[1]); log('HITSTER -> Karte ' + cardNum, 'info'); }
   }
 
-  // Format 3: Nur Zahl
   if (!cardNum) {
     const n = parseInt(decodedText.trim());
     if (n >= 1 && n <= 30) { cardNum = n; log('Zahl -> Karte ' + cardNum, 'info'); }
@@ -291,61 +586,95 @@ function onScanSuccess(decodedText) {
   }
 }
 
-// ── MANUAL ──
+// ══════════════════════════════════════════════
+// PLAY SONG (Spotify Connect API – echtes Auto-Play!)
+// ══════════════════════════════════════════════
+async function playSong(cardNum) {
+  const song = SONGS.find(s => s.id === cardNum);
+  if (!song) return;
+
+  log('Karte ' + cardNum + ' – starte Spotify Wiedergabe...', 'info');
+  document.getElementById('playingNumber').textContent = cardNum;
+  document.getElementById('playError').style.display = 'none';
+  showScreen('screen-playing');
+
+  const success = await startPlayback(song.spotify);
+  if (success) {
+    log('Karte ' + cardNum + ' spielt!', 'info');
+  } else {
+    log('Wiedergabe konnte nicht gestartet werden.', 'err');
+  }
+}
+
+// ══════════════════════════════════════════════
+// MANUAL INPUT
+// ══════════════════════════════════════════════
 function playManual() {
   const num = parseInt(document.getElementById('manualInput').value);
   if (num >= 1 && num <= 30) { log('Manuell: Karte ' + num, 'info'); playSong(num); }
 }
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('manualInput').addEventListener('keydown', e => { if (e.key === 'Enter') playManual(); });
-});
 
-// ── PLAY SONG (Spotify Embed) ──
-function playSong(cardNum) {
-  const song = SONGS.find(s => s.id === cardNum);
-  if (!song) return;
-
-  log('Lade Karte ' + cardNum, 'info');
-  document.getElementById('playingNumber').textContent = cardNum;
-  document.getElementById('scrollToPlayerBtn').style.display = '';
-  document.getElementById('playingStatusHint').style.display = 'none';
-  showScreen('screen-playing');
-
-  // Load Spotify embed (below visible area)
-  const container = document.getElementById('spotify-embed-container');
-  container.innerHTML = `<iframe
-    src="https://open.spotify.com/embed/track/${song.spotify}?utm_source=generator&theme=0"
-    width="100%" height="152" frameBorder="0"
-    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-    loading="eager"
-    style="border-radius:12px"></iframe>`;
-
-  log('Embed geladen. Tippe "Musik starten".', 'info');
-}
-
-function scrollToPlayer() {
-  const container = document.getElementById('spotify-embed-container');
-  container.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  // Switch button states
-  document.getElementById('scrollToPlayerBtn').style.display = 'none';
-  document.getElementById('playingStatusHint').style.display = 'flex';
-}
-
-// ── URL PARAMETER ──
-function checkUrlParam() {
+// ══════════════════════════════════════════════
+// URL PARAMETER & INIT
+// ══════════════════════════════════════════════
+async function init() {
   const params = new URLSearchParams(window.location.search);
+
+  // Handle OAuth callback
+  const code = params.get('code');
+  if (code) {
+    log('OAuth Callback empfangen', 'info');
+    await handleSpotifyCallback(code);
+    return;
+  }
+
+  // Handle card parameter (from QR code)
   const cardParam = params.get('card');
   if (cardParam) {
     const cardNum = parseInt(cardParam);
     if (cardNum >= 1 && cardNum <= 30) {
       window.history.replaceState({}, '', window.location.pathname);
-      setTimeout(() => playSong(cardNum), 500);
+      // Save pending card for after login
+      try { sessionStorage.setItem('hitster_pending_card', cardNum.toString()); } catch(e) {}
     }
   }
-}
-document.addEventListener('DOMContentLoaded', checkUrlParam);
 
-// ── SONG LIST ──
+  // Try restore session
+  try {
+    const savedToken = sessionStorage.getItem('hitster_token');
+    const savedClientId = sessionStorage.getItem('hitster_client_id');
+    if (savedToken && savedClientId) {
+      spotifyToken = savedToken;
+      spotifyClientId = savedClientId;
+      log('Session wiederhergestellt', 'info');
+
+      // Check if there's a pending card
+      const pendingCard = sessionStorage.getItem('hitster_pending_card');
+      if (pendingCard) {
+        sessionStorage.removeItem('hitster_pending_card');
+        showScreen('screen-home');
+        playSong(parseInt(pendingCard));
+        return;
+      }
+
+      showScreen('screen-home');
+      return;
+    }
+  } catch(e) {}
+
+  // No session – show setup
+  log('Bitte Spotify verbinden', 'info');
+  showScreen('screen-setup');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('manualInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') playManual(); });
+  init();
+});
+
+// ══════════════════════════════════════════════
+// SONG LIST (Spoiler)
+// ══════════════════════════════════════════════
 function showSongList() {
   document.getElementById('songGrid').innerHTML = SONGS.map(s => `
     <div class="song-item">
