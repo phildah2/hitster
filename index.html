@@ -211,6 +211,7 @@
     <div class="song-grid" id="deviceGrid" style="margin-top:10px"></div>
     <div style="display:flex;gap:10px;width:100%;max-width:380px">
       <button class="btn btn-secondary btn-small" onclick="refreshDevices()">Ger&auml;te aktualisieren</button>
+      <button class="btn btn-secondary btn-small" onclick="clearPreferredDevice()">Zielger&auml;t l&ouml;schen</button>
       <button class="btn btn-primary btn-small" onclick="showHome()">Fertig</button>
     </div>
     <div class="debug-log" id="debugLogDevices"></div>
@@ -522,10 +523,17 @@ async function handleSpotifyCallback(code) {
       }
     } else {
       log('Token-Fehler: ' + JSON.stringify(data), 'err');
+      // Clean URL (avoid repeated invalid_grant on refresh/back)
+      window.history.replaceState({}, '', window.location.pathname);
+      try {
+        sessionStorage.removeItem('hitster_code_verifier');
+      } catch(e) {}
       showScreen('screen-setup');
     }
   } catch(e) {
     log('Netzwerkfehler: ' + e.message, 'err');
+    // Clean URL (avoid retry loops)
+    window.history.replaceState({}, '', window.location.pathname);
     showScreen('screen-setup');
   }
 }
@@ -692,12 +700,18 @@ async function startPlayback(spotifyTrackId) {
   const devices = await getDevices(2);
   const preferred = preferredDeviceId ? devices.find(d => d.id === preferredDeviceId) : null;
   const active = devices.find(d => d.is_active);
-  let chosen = preferred || active || devices[0] || null;
+
+  // If user selected a preferred device, do NOT fall back to random other devices (e.g. Mobile Web Player)
+  let chosen = null;
+  if (preferredDeviceId) {
+    chosen = preferred || { id: preferredDeviceId, name: preferredDeviceName || 'Gespeichertes Zielgerät', type: 'saved', is_active: false, volume_percent: null, __saved: true };
+  } else {
+    chosen = active || devices[0] || null;
+  }
 
   // Critical improvement: if devices endpoint is temporarily empty, still try the saved preferred device_id
-  if (!chosen && preferredDeviceId) {
-    chosen = { id: preferredDeviceId, name: preferredDeviceName || 'Gespeichertes Zielgerät', type: 'saved', is_active: false, volume_percent: null, __saved: true };
-    log('Geräteliste leer – nutze gespeichertes Zielgerät trotzdem', 'warn', { preferredDeviceId });
+  if (preferredDeviceId && (!preferred || devices.length === 0)) {
+    log('Nutze Zielgerät (auch wenn nicht gelistet)', 'warn', { preferredDeviceId, devicesSeen: devices.map(d => d.id) });
   }
 
   if (!chosen) {
@@ -724,6 +738,11 @@ async function startPlayback(spotifyTrackId) {
   }
 
   // Strategie 2: Ohne device_id (Spotify entscheidet)
+  // Only use auto-device fallback if no preferred device is set.
+  if (preferredDeviceId) {
+    showPlayError('Zielgerät aktuell nicht erreichbar. Öffne Spotify auf deinem iPhone und starte kurz einen Song, dann erneut versuchen.', { chosen, lastSpotifyError });
+    return false;
+  }
   log('Fallback: Play ohne device_id...', 'warn');
   const r2 = await spotifyApi('/me/player/play', 'PUT', trackBody);
   if (r2 !== null) {
@@ -802,6 +821,18 @@ function openDevicePanel() {
   document.getElementById('debugLogDevices').innerHTML = '';
   showScreen('screen-devices');
   refreshDevices();
+}
+
+function clearPreferredDevice() {
+  preferredDeviceId = null;
+  preferredDeviceName = null;
+  try {
+    localStorage.removeItem(DEVICE_KEY);
+    localStorage.removeItem(DEVICE_NAME_KEY);
+  } catch(e) {}
+  log('Zielgerät gelöscht', 'info');
+  updateSpotifyBadge();
+  refreshDevices(1);
 }
 
 function setPreferredDevice(id, name = null) {
