@@ -137,18 +137,19 @@
       <div class="card-number" id="playingNumber">?</div>
       <div class="card-label">von 30</div>
     </div>
-    <div class="playing-status"><div class="pulse-dot"></div> Wird abgespielt...</div>
-    <div style="font-size:13px;color:var(--text-dim);padding:8px 16px">
-      &#128071; Scrolle nach unten zum Player falls die Musik nicht startet.
-    </div>
-    <button class="btn btn-primary" onclick="showHome()">&#127912; N&auml;chste Karte</button>
+    <button class="btn btn-primary" id="scrollToPlayerBtn" onclick="scrollToPlayer()" style="font-size:20px;padding:18px 28px">
+      &#9654; Musik starten
+    </button>
+    <div class="playing-status" id="playingStatusHint" style="display:none"><div class="pulse-dot"></div> Wird abgespielt...</div>
+    <button class="btn btn-primary" onclick="showHome()" style="margin-top:4px">&#127912; N&auml;chste Karte</button>
     <button class="btn btn-small" style="background:none;color:var(--text-dim)" onclick="showSongList()">
       &#128065; Alle Songs (Spoiler!)
     </button>
     <!-- Spacer to push embed out of view -->
     <div class="scroll-spacer"></div>
-    <div class="embed-label">&#9660; Spotify Player (nach unten gescrollt)</div>
-    <div class="embed-area" id="spotify-embed-container"></div>
+    <div class="embed-label">&#9660; Druecke Play im Spotify-Player:</div>
+    <div class="embed-area" id="spotify-embed-container" style="opacity:1"></div>
+    <div style="height:30vh"></div>
   </div>
 
   <!-- SONG LIST -->
@@ -160,7 +161,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script src="https://open.spotify.com/embed/iframe-api/v1"></script>
 <script>
 const SONGS = [
   { id:1,  year:2016, title:"Faded",                    artist:"Alan Walker",                     spotify:"698ItKASDavgwZ3WjaWjtz" },
@@ -198,21 +198,6 @@ const SONGS = [
 let scanner = null;
 let isScanning = false;
 let scanProcessing = false;
-let SpotifyAPI = null;
-let spotifyController = null;
-let pendingSong = null;
-
-// Spotify IFrame API ready callback
-window.onSpotifyIframeApiReady = (IFrameAPI) => {
-  SpotifyAPI = IFrameAPI;
-  log('Spotify IFrame API geladen', 'info');
-  // If a song was requested before API was ready, play it now
-  if (pendingSong) {
-    const s = pendingSong;
-    pendingSong = null;
-    createSpotifyEmbed(s);
-  }
-};
 
 function log(msg, type = '') {
   const line = `<div class="${type}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
@@ -315,83 +300,35 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('manualInput').addEventListener('keydown', e => { if (e.key === 'Enter') playManual(); });
 });
 
-// ── PLAY SONG (Spotify IFrame API - Auto-Play!) ──
+// ── PLAY SONG (Spotify Embed) ──
 function playSong(cardNum) {
   const song = SONGS.find(s => s.id === cardNum);
   if (!song) return;
 
-  log('Starte Song Karte ' + cardNum + ' (Spotify IFrame API)', 'info');
+  log('Lade Karte ' + cardNum, 'info');
   document.getElementById('playingNumber').textContent = cardNum;
+  document.getElementById('scrollToPlayerBtn').style.display = '';
+  document.getElementById('playingStatusHint').style.display = 'none';
   showScreen('screen-playing');
 
-  // Destroy previous controller
-  if (spotifyController) {
-    try { spotifyController.destroy(); } catch(e) {}
-    spotifyController = null;
-  }
+  // Load Spotify embed (below visible area)
+  const container = document.getElementById('spotify-embed-container');
+  container.innerHTML = `<iframe
+    src="https://open.spotify.com/embed/track/${song.spotify}?utm_source=generator&theme=0"
+    width="100%" height="152" frameBorder="0"
+    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+    loading="eager"
+    style="border-radius:12px"></iframe>`;
 
-  if (SpotifyAPI) {
-    createSpotifyEmbed(song);
-  } else {
-    log('Spotify API noch nicht bereit, warte...', 'warn');
-    pendingSong = song;
-    // Fallback: if API doesn't load within 3s, use regular iframe
-    setTimeout(() => {
-      if (pendingSong) {
-        log('API Timeout - Fallback auf normalen Embed', 'warn');
-        pendingSong = null;
-        createFallbackEmbed(song);
-      }
-    }, 3000);
-  }
+  log('Embed geladen. Tippe "Musik starten".', 'info');
 }
 
-function createSpotifyEmbed(song) {
+function scrollToPlayer() {
   const container = document.getElementById('spotify-embed-container');
-  container.innerHTML = '';
-  const embedDiv = document.createElement('div');
-  embedDiv.id = 'spotify-embed-el';
-  container.appendChild(embedDiv);
-
-  log('Erstelle Spotify Controller fuer: ' + song.spotify, 'info');
-
-  const options = {
-    uri: 'spotify:track:' + song.spotify,
-    width: '100%',
-    height: 152,
-    theme: 0
-  };
-
-  SpotifyAPI.createController(embedDiv, options, (controller) => {
-    spotifyController = controller;
-    log('Controller erstellt. Versuche Auto-Play...', 'info');
-
-    // Listen for ready event, then play
-    controller.addListener('ready', () => {
-      log('Player ready - starte Wiedergabe!', 'info');
-      controller.play();
-    });
-
-    // Also try play after short delay as backup
-    setTimeout(() => {
-      try {
-        controller.togglePlay();
-        log('togglePlay() aufgerufen', 'info');
-      } catch(e) {
-        log('togglePlay Fehler: ' + e.message, 'warn');
-      }
-    }, 1500);
-  });
-}
-
-function createFallbackEmbed(song) {
-  const container = document.getElementById('spotify-embed-container');
-  container.innerHTML = '<iframe ' +
-    'src="https://open.spotify.com/embed/track/' + song.spotify + '?utm_source=generator&theme=0" ' +
-    'width="100%" height="152" frameBorder="0" ' +
-    'allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" ' +
-    'loading="eager" style="border-radius:12px"></iframe>';
-  log('Fallback-Embed geladen. Scrolle runter zum Player.', 'warn');
+  container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Switch button states
+  document.getElementById('scrollToPlayerBtn').style.display = 'none';
+  document.getElementById('playingStatusHint').style.display = 'flex';
 }
 
 // ── URL PARAMETER ──
