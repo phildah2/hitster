@@ -91,11 +91,13 @@
   .or-divider { color: var(--text-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; }
 
   .playing-card {
-    background: var(--card-bg); border-radius: 24px; padding: 32px 24px;
+    background: var(--card-bg); border-radius: 20px; padding: 18px 18px;
     width: 100%; max-width: 300px;
   }
-  .playing-card .card-number { font-size: 64px; font-weight: 800; color: var(--accent); line-height: 1; }
-  .playing-card .card-label { font-size: 15px; color: var(--text-dim); margin-top: 6px; }
+  .playing-cardline { font-size: 20px; font-weight: 900; letter-spacing: 0.3px; }
+  .playing-cardline #playingNumber { color: var(--accent); }
+  .playing-total { color: var(--text-dim); font-weight: 800; }
+  .playing-subtle { margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.55); line-height: 1.35; }
   .playing-status { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 15px; color: var(--success); font-weight: 600; }
   .pulse-dot { width: 12px; height: 12px; background: var(--success); border-radius: 50%; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
@@ -167,7 +169,7 @@
 
 <div class="header">
   <h1>HITSTER<span>+</span></h1>
-  <div class="subtitle">Erweiterungsset &middot; 120 Karten</div>
+  <div class="subtitle">Erweiterungsset &middot; 150 Karten</div>
   <div class="build-info" id="buildInfo">Version: …</div>
 </div>
 
@@ -211,7 +213,7 @@
         <div class="more-body">
           <div class="or-divider" style="margin-top:2px">Manuell</div>
           <div class="manual-input-row">
-            <input type="number" id="manualInput" min="1" max="120" placeholder="Nr." inputmode="numeric">
+            <input type="number" id="manualInput" min="1" max="150" placeholder="Nr." inputmode="numeric">
             <button class="btn btn-secondary btn-small" onclick="playManual()">&#9654; Play</button>
           </div>
 
@@ -237,15 +239,6 @@
           <div style="font-size:12px;color:rgba(255,255,255,0.55);line-height:1.35">
             H&auml;lt Spotify auf dem iPhone aktiv (stumm), damit Play beim n&auml;chsten Scan seltener scheitert.
           </div>
-
-          <div class="or-divider" style="margin-top:2px">Spoiler</div>
-          <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:rgba(255,255,255,0.85);font-weight:700">
-            <span>Song‑Info anzeigen</span>
-            <input id="songInfoToggle" type="checkbox" style="transform:scale(1.2)" onchange="setSongInfoVisible(this.checked)">
-          </label>
-          <div style="font-size:12px;color:rgba(255,255,255,0.55);line-height:1.35">
-            Blendet Titel &amp; Interpret auf dem Playing‑Screen ein (standardm&auml;&szlig;ig aus).
-          </div>
         </div>
       </details>
     </div>
@@ -264,11 +257,11 @@
   <!-- PLAYING -->
   <div id="screen-playing" class="screen">
     <div class="playing-card">
-      <div class="card-label">Karte</div>
-      <div class="card-number" id="playingNumber">?</div>
-      <div class="card-label">von 120</div>
+      <div class="playing-cardline">
+        Karte <span id="playingNumber">?</span> <span class="playing-total">von 150</span>
+      </div>
+      <div class="playing-subtle">Scan l&auml;uft weiter in der App (Spotify bleibt im Hintergrund)</div>
     </div>
-    <div id="playingSongInfo" style="display:none;font-size:13px;color:rgba(255,255,255,0.9);max-width:340px;text-align:center;font-weight:800;margin-top:6px"></div>
     <div id="playingDeviceInfo" style="font-size:12px;color:var(--text-dim);max-width:340px;text-align:center"></div>
     <button id="openSpotifyPlayBtn" class="btn btn-spotify btn-small" style="display:none" onclick="openSpotifyApp()">Spotify &ouml;ffnen</button>
     <button id="openTrackBtn" class="btn btn-spotify btn-small" style="display:none" onclick="openCurrentTrack()">Song in Spotify &ouml;ffnen</button>
@@ -279,12 +272,45 @@
       <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="showSongList()">&#128065; Songs</button>
       <button class="btn btn-small btn-danger" style="max-width:145px" onclick="stopPlayback()">&#9724; Stopp</button>
     </div>
+
+    <div class="more-panel" style="margin-top:10px">
+      <details class="more">
+        <summary>
+          <span>Optionen</span>
+          <span style="color:rgba(255,255,255,0.5);font-weight:800">+</span>
+        </summary>
+        <div class="more-body">
+          <button class="btn btn-secondary btn-small" onclick="openDevicePanel()">&#128266; Spotify-Ger&auml;te (Details)</button>
+
+          <div class="or-divider" style="margin-top:2px">Debug</div>
+          <div style="display:flex;gap:10px;width:100%;justify-content:center">
+            <button class="btn btn-small btn-secondary" style="max-width:170px" onclick="toggleDebug()">Debug-Log</button>
+            <button class="btn btn-small btn-secondary" style="max-width:170px" onclick="exportLog()">Export</button>
+          </div>
+          <div style="display:flex;gap:10px;width:100%;justify-content:center">
+            <button class="btn btn-small btn-secondary" style="max-width:170px" onclick="copyLog()">Kopieren</button>
+            <button class="btn btn-small btn-secondary" style="max-width:170px" onclick="clearLog()">Leeren</button>
+          </div>
+
+          <div class="or-divider" style="margin-top:2px">Playback</div>
+          <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:rgba(255,255,255,0.85);font-weight:700">
+            <span>Keep‑Alive bei Stopp</span>
+            <input id="keepAliveTogglePlay" type="checkbox" style="transform:scale(1.2)" onchange="setKeepAlive(this.checked)">
+          </label>
+          <div style="font-size:12px;color:rgba(255,255,255,0.55);line-height:1.35">
+            H&auml;lt Spotify aktiv (stumm), damit Play beim n&auml;chsten Scan seltener scheitert.
+          </div>
+
+          <button class="btn btn-small subtle-link-btn" onclick="spotifyLogout()">Spotify trennen</button>
+        </div>
+      </details>
+    </div>
     <div class="debug-log" id="debugLogPlay"></div>
   </div>
 
   <!-- SONG LIST -->
   <div id="screen-songs" class="screen">
-    <h2 style="font-size:18px">Alle 120 Songs</h2>
+    <h2 style="font-size:18px">Alle 150 Songs</h2>
     <div class="song-grid" id="songGrid"></div>
     <button class="btn btn-secondary btn-small" onclick="showHome()" style="margin-top:8px">&#8592; Zur&uuml;ck</button>
   </div>
@@ -443,6 +469,38 @@ const SONGS = [
   { id:118, year:2005, title:"I Bet You Look Good on the Dancefloor", artist:"Arctic Monkeys",            spotify:"3DQVgcqaP3iSMbaKsd57l5" },
   { id:119, year:1978, title:"Roxanne",                           artist:"The Police",                     spotify:"3EYOJ48Et32uATr9ZmLnAo" },
   { id:120, year:2004, title:"Take Me Out",                       artist:"Franz Ferdinand",                spotify:"20I8RduZC2PWMWTDCZuuAN" },
+
+  // ── Set 5 – 60er & 70er Jahre (121-150) ──
+  { id:121, year:1965, title:"(I Can't Get No) Satisfaction",      artist:"The Rolling Stones",             spotify:"2PzU4IB8Dr6mxV3lHuaG34" },
+  { id:122, year:1967, title:"Light My Fire",                      artist:"The Doors",                      spotify:"5uvosCdMlFdTXhoazkTI5R" },
+  { id:123, year:1969, title:"Proud Mary",                         artist:"Creedence Clearwater Revival",    spotify:"2EZc13S7YRi6bTS3SKteRN" },
+  { id:124, year:1968, title:"Born to Be Wild",                    artist:"Steppenwolf",                    spotify:"63OFKbMaZSDZ4wtesuuq6f" },
+  { id:125, year:1967, title:"Purple Haze",                        artist:"Jimi Hendrix",                   spotify:"6T4LRW7eoGLemre5gRhqTh" },
+  { id:126, year:1969, title:"Space Oddity",                       artist:"David Bowie",                    spotify:"4nxdNfQzvwUtpNSG4AaWPZ" },
+  { id:127, year:1966, title:"Good Vibrations",                    artist:"The Beach Boys",                 spotify:"5t9KYe0Fhd5cW6UYT4qP8f" },
+  { id:128, year:1967, title:"A Whiter Shade of Pale",             artist:"Procol Harum",                   spotify:"0B362KR48YOWcDbnsZH7dN" },
+  { id:129, year:1969, title:"Pinball Wizard",                     artist:"The Who",                        spotify:"6LbbHFEajG9e4m0G3L47c4" },
+  { id:130, year:1968, title:"Hey Jude",                           artist:"The Beatles",                    spotify:"0eY0YgyLAZ4gtM57wwYN7H" },
+  { id:131, year:1975, title:"Bohemian Rhapsody",                  artist:"Queen",                          spotify:"7tFiyTwD0nx5a1eklYtX2J" },
+  { id:132, year:1973, title:"Smoke on the Water",                 artist:"Deep Purple",                    spotify:"5SAUIWdZ04OxYfJFDchC7S" },
+  { id:133, year:1977, title:"Hotel California",                   artist:"Eagles",                         spotify:"4GkOfUKUqDDgoeiov8Uqyi" },
+  { id:134, year:1971, title:"Stairway to Heaven",                 artist:"Led Zeppelin",                   spotify:"0AJ62x1CXjJf3VW25CeZXa" },
+  { id:135, year:1970, title:"Paranoid",                           artist:"Black Sabbath",                  spotify:"3L8WgDYS5TtwbyxOPSAiFf" },
+  { id:136, year:1972, title:"Superstition",                       artist:"Stevie Wonder",                  spotify:"4N0TP4Rmj6QQezWV88ARNJ" },
+  { id:137, year:1976, title:"(Don't Fear) The Reaper",            artist:"Blue Öyster Cult",               spotify:"5QTxFnGygVM4jFQiBovmRo" },
+  { id:138, year:1970, title:"Bridge Over Troubled Water",         artist:"Simon & Garfunkel",              spotify:"6l8EbYRtQMgKOyc1gcDHF9" },
+  { id:139, year:1971, title:"Imagine",                            artist:"John Lennon",                    spotify:"0sKVgEEApbh4EmJJyoUmBB" },
+  { id:140, year:1963, title:"Blowin' in the Wind",                artist:"Bob Dylan",                      spotify:"18GiV1BaXzPVYpp9rmOg0E" },
+  { id:141, year:1970, title:"War",                                artist:"Edwin Starr",                    spotify:"57DKmLJBRI5ZtiCgLUQMZY" },
+  { id:142, year:1971, title:"Macht kaputt was euch kaputt macht", artist:"Ton Steine Scherben",            spotify:"2Uf1RUfs6sbGXVrwTETMYS" },
+  { id:143, year:1977, title:"Es ist an der Zeit",                 artist:"Hannes Wader",                   spotify:"6ia6QZXEq1TiPhhR8MAiGm" },
+  { id:144, year:1974, title:"Griechischer Wein",                  artist:"Udo Jürgens",                    spotify:"2QoNOKOZBuZ9intxxlBpA6" },
+  { id:145, year:1965, title:"Marmor, Stein und Eisen bricht",     artist:"Drafi Deutscher",                spotify:"70gS6bjAjFc96IIunuRj1c" },
+  { id:146, year:1970, title:"Lola",                               artist:"The Kinks",                      spotify:"0XvvqmKU9qggK9KW3CZqzM" },
+  { id:147, year:1975, title:"Wish You Were Here",                 artist:"Pink Floyd",                     spotify:"6mFkJmJqdDVQ1REhVfGgd1" },
+  { id:148, year:1969, title:"Aquarius / Let the Sunshine In",     artist:"The 5th Dimension",              spotify:"0HZlND4giwzgolBpaNIRGV" },
+  { id:149, year:1973, title:"Radar Love",                         artist:"Golden Earring",                 spotify:"20aASiwfsbiLlaJxLiC0PQ" },
+  { id:150, year:1962, title:"Sag mir wo die Blumen sind",         artist:"Marlene Dietrich",               spotify:"79S2bCnwMRYA4twpRvmREG" },
 ];
 
 // ══════════════════════════════════════════════
@@ -469,7 +527,6 @@ let debugEnabled = false;
 let lastSpotifyError = null;
 let spotifyProfile = null;
 let currentTrackSpotifyId = null;
-let currentCardNum = null;
 const LOG_KEY = 'hitster_log_v1';
 const DEBUG_KEY = 'hitster_debug_v1';
 const DEVICE_KEY = 'hitster_preferred_device_v1';
@@ -479,8 +536,6 @@ const LAST_DEVICE_NAME_KEY = 'hitster_last_device_name_v1';
 const KEEP_ALIVE_KEY = 'hitster_keep_alive_v1';
 const KEEP_ALIVE_VOL_KEY = 'hitster_keep_alive_prev_vol_v1';
 const KEEP_ALIVE_DEVICE_KEY = 'hitster_keep_alive_device_v1';
-const SONGINFO_KEY = 'hitster_songinfo_v1';
-let songInfoVisible = false;
 
 // Neutraler "Silence"-Track (nicht Teil des Spiels)
 const KEEP_ALIVE_TRACK_ID = '2bNCdW4rLnCTzgqUXTTDO1'; // John Cage – 4'33''
@@ -845,35 +900,13 @@ function clearPlayError() {
 function setKeepAlive(enabled) {
   keepAliveEnabled = !!enabled;
   try { localStorage.setItem(KEEP_ALIVE_KEY, keepAliveEnabled ? '1' : '0'); } catch(e) {}
+  try {
+    const t1 = document.getElementById('keepAliveToggle');
+    if (t1) t1.checked = !!keepAliveEnabled;
+    const t2 = document.getElementById('keepAliveTogglePlay');
+    if (t2) t2.checked = !!keepAliveEnabled;
+  } catch(e) {}
   log('Keep-Alive ' + (keepAliveEnabled ? 'aktiviert' : 'deaktiviert'), 'info');
-}
-
-function setSongInfoVisible(visible) {
-  songInfoVisible = !!visible;
-  try { localStorage.setItem(SONGINFO_KEY, songInfoVisible ? '1' : '0'); } catch(e) {}
-  const el = document.getElementById('playingSongInfo');
-  if (el) el.style.display = songInfoVisible ? '' : 'none';
-  updatePlayingSongInfo();
-  log('Song-Info ' + (songInfoVisible ? 'eingeblendet' : 'ausgeblendet'), 'info');
-}
-
-function updatePlayingSongInfo(song = null) {
-  const el = document.getElementById('playingSongInfo');
-  if (!el) return;
-  if (!songInfoVisible) { el.style.display = 'none'; return; }
-
-  let s = song;
-  if (!s && typeof currentCardNum === 'number') {
-    s = SONGS.find(x => x.id === currentCardNum) || null;
-  }
-  if (!s) {
-    el.textContent = '';
-    el.style.display = '';
-    return;
-  }
-  const year = s.year ? ` (${s.year})` : '';
-  el.textContent = `${s.title} — ${s.artist}${year}`;
-  el.style.display = '';
 }
 
 function openSpotifyTrack(trackId) {
@@ -1337,8 +1370,6 @@ function showHome() {
   document.getElementById('manualInput').value = '';
   const info = document.getElementById('playingDeviceInfo');
   if (info) info.textContent = '';
-  const si = document.getElementById('playingSongInfo');
-  if (si) si.textContent = '';
 }
 
 function nextCard() {
@@ -1610,14 +1641,14 @@ function extractCardNumber(raw) {
     const qp = u.searchParams.get('card') || u.searchParams.get('karte') || u.searchParams.get('c');
     if (qp) {
       const n = parseInt(qp, 10);
-      if (n >= 1 && n <= 120) return n;
+      if (n >= 1 && n <= 150) return n;
     }
     // last path segment that is 1-2 digits
     const segs = u.pathname.split('/').filter(Boolean);
     for (let i = segs.length - 1; i >= 0; i--) {
       if (/^\d{1,3}$/.test(segs[i])) {
         const n = parseInt(segs[i], 10);
-        if (n >= 1 && n <= 120) return n;
+        if (n >= 1 && n <= 150) return n;
       }
     }
   } catch {}
@@ -1626,18 +1657,18 @@ function extractCardNumber(raw) {
   const m1 = text.match(/[?&](?:card|karte|c)=(\d{1,3})/i);
   if (m1) {
     const n = parseInt(m1[1], 10);
-    if (n >= 1 && n <= 120) return n;
+    if (n >= 1 && n <= 150) return n;
   }
   const m2 = text.match(/(?:HITSTER|H\+|KARTE|CARD)[^\d]{0,10}(\d{1,3})/i);
   if (m2) {
     const n = parseInt(m2[1], 10);
-    if (n >= 1 && n <= 120) return n;
+    if (n >= 1 && n <= 150) return n;
   }
 
   // 3) plain number
   if (/^\d{1,3}$/.test(text)) {
     const n = parseInt(text, 10);
-    if (n >= 1 && n <= 120) return n;
+    if (n >= 1 && n <= 150) return n;
   }
 
   return null;
@@ -1708,7 +1739,7 @@ function onScanSuccess(decodedText) {
   scanProcessing = true;
   const cardNum = extractCardNumber(decodedText);
 
-  if (cardNum && cardNum >= 1 && cardNum <= 120) {
+  if (cardNum && cardNum >= 1 && cardNum <= 150) {
     log('Starte Karte ' + cardNum, 'info');
     try { navigator.vibrate?.(50); } catch {}
     if (scanner && isScanning) {
@@ -1731,12 +1762,10 @@ async function playSong(cardNum) {
   if (!song) return;
 
   log('Karte ' + cardNum + ' – starte Spotify Wiedergabe...', 'info');
-  currentCardNum = cardNum;
   document.getElementById('playingNumber').textContent = cardNum;
   document.getElementById('playError').style.display = 'none';
   currentTrackSpotifyId = song.spotify;
   showScreen('screen-playing');
-  updatePlayingSongInfo(song);
 
   const success = await startPlayback(song.spotify);
   if (success) {
@@ -1751,7 +1780,7 @@ async function playSong(cardNum) {
 // ══════════════════════════════════════════════
 function playManual() {
   const num = parseInt(document.getElementById('manualInput').value);
-  if (num >= 1 && num <= 120) { log('Manuell: Karte ' + num, 'info'); playSong(num); }
+  if (num >= 1 && num <= 150) { log('Manuell: Karte ' + num, 'info'); playSong(num); }
 }
 
 // ══════════════════════════════════════════════
@@ -1774,7 +1803,7 @@ async function init() {
   const cardParam = params.get('card');
   if (cardParam) {
     const cardNum = parseInt(cardParam);
-    if (cardNum >= 1 && cardNum <= 120) {
+    if (cardNum >= 1 && cardNum <= 150) {
       window.history.replaceState({}, '', window.location.pathname);
       // Save pending card for after login
       try { sessionStorage.setItem('hitster_pending_card', cardNum.toString()); } catch(e) {}
@@ -1826,8 +1855,6 @@ document.addEventListener('DOMContentLoaded', () => {
     keepAliveDeviceId = localStorage.getItem(KEEP_ALIVE_DEVICE_KEY);
     const dbg = localStorage.getItem(DEBUG_KEY);
     if (dbg === '0') debugEnabled = false;
-    const si = localStorage.getItem(SONGINFO_KEY);
-    if (si === '1') songInfoVisible = true;
   } catch(e) {}
   setDebugVisible(debugEnabled);
   try {
@@ -1835,13 +1862,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (t) t.checked = !!keepAliveEnabled;
   } catch(e) {}
   try {
-    const t = document.getElementById('songInfoToggle');
-    if (t) t.checked = !!songInfoVisible;
+    const t = document.getElementById('keepAliveTogglePlay');
+    if (t) t.checked = !!keepAliveEnabled;
   } catch(e) {}
-  try {
-    const el = document.getElementById('playingSongInfo');
-    if (el) el.style.display = songInfoVisible ? '' : 'none';
-  } catch(e) {}
+  // Cleanup: removed spoiler feature
+  try { localStorage.removeItem('hitster_songinfo_v1'); } catch(e) {}
   try {
     const lm = new Date(document.lastModified);
     const dt = isNaN(lm.getTime()) ? new Date() : lm;
