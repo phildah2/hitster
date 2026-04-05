@@ -821,6 +821,17 @@ function classifySpotifyPlayerError(err) {
   return null;
 }
 
+function isVolumeControlDisallowed(err) {
+  if (!err) return false;
+  const status = err.status;
+  const e = err.data?.error || err.data || {};
+  const reason = String(e.reason || '').toUpperCase();
+  const msg = String(e.message || err.data?.raw || '').toLowerCase();
+  if (status === 403 && reason === 'VOLUME_CONTROL_DISALLOW') return true;
+  if (status === 403 && msg.includes('cannot control device volume')) return true;
+  return false;
+}
+
 function clearPlayError() {
   const el = document.getElementById('playError');
   el.style.display = 'none';
@@ -983,7 +994,10 @@ async function tryRestoreVolumeIfNeeded() {
   if (keepAlivePrevVolume < 1) return;
 
   log('Restore Volume', 'info', { device: keepAliveDeviceId, volume: keepAlivePrevVolume });
-  await spotifyApi('/me/player/volume?volume_percent=' + encodeURIComponent(String(keepAlivePrevVolume)) + '&device_id=' + encodeURIComponent(keepAliveDeviceId), 'PUT');
+  const r = await spotifyApi('/me/player/volume?volume_percent=' + encodeURIComponent(String(keepAlivePrevVolume)) + '&device_id=' + encodeURIComponent(keepAliveDeviceId), 'PUT');
+  if (r === null && isVolumeControlDisallowed(lastSpotifyError)) {
+    log('Restore Volume: nicht erlaubt – ignoriere', 'warn', { lastSpotifyError });
+  }
   keepAliveArmed = false;
   try {
     localStorage.removeItem(KEEP_ALIVE_VOL_KEY);
@@ -1005,12 +1019,15 @@ function normalizeDevice(d) {
 function isWebPlayerDevice(dev) {
   const name = String(dev?.name || '').toLowerCase();
   const type = String(dev?.type || '').toLowerCase();
-  return name.includes('web player') || name.includes('webplayer') || type.includes('computer');
+  // Treat "Mobile Web Player" as web-player too (it often shows as Smartphone, but is still a browser session)
+  return name.includes('web player') || name.includes('webplayer') || name.includes('mobile web player') || type.includes('computer');
 }
 
 function isIphoneLikeDevice(dev) {
   const name = String(dev?.name || '');
   const type = String(dev?.type || '').toLowerCase();
+  // Important: don't classify Mobile Web Player as "phone"
+  if (isWebPlayerDevice(dev)) return false;
   return /iphone/i.test(name) || type.includes('smartphone');
 }
 
@@ -1260,12 +1277,14 @@ async function stopPlayback() {
   // Determine device to keep alive (prefer iPhone)
   const devices = await getDevices(1);
   const dev = pickBestDevice(devices) || devices[0] || null;
-  const deviceId = dev?.id || preferredDeviceId || lastGoodDeviceId || null;
+  // Never keep-alive on Web Players (they cause wrong-device playback later)
+  const keepAliveDev = (dev && !isWebPlayerDevice(dev)) ? dev : null;
+  const deviceId = keepAliveDev?.id || (preferredDeviceId ? preferredDeviceId : null) || (lastGoodDeviceId ? lastGoodDeviceId : null) || null;
   keepAliveDeviceId = deviceId;
 
   // Try remember previous volume from device list
-  if (dev && typeof dev.volume_percent === 'number') {
-    keepAlivePrevVolume = dev.volume_percent;
+  if (keepAliveDev && typeof keepAliveDev.volume_percent === 'number') {
+    keepAlivePrevVolume = keepAliveDev.volume_percent;
   } else if (typeof keepAlivePrevVolume !== 'number') {
     keepAlivePrevVolume = 100;
   }
@@ -1277,7 +1296,12 @@ async function stopPlayback() {
   if (deviceId) {
     // Set volume 0 on the device, then play silent track
     const v = await spotifyApi('/me/player/volume?volume_percent=0&device_id=' + encodeURIComponent(deviceId), 'PUT');
-    if (v === null) {
+    if (v === null && isVolumeControlDisallowed(lastSpotifyError)) {
+      // Not fatal: we can still play the silent track; just don't restore volume later.
+      log('Keep-Alive: Volume-Control nicht erlaubt – fahre ohne Volume-Set fort', 'warn', { lastSpotifyError });
+      keepAlivePrevVolume = null;
+      try { localStorage.removeItem(KEEP_ALIVE_VOL_KEY); } catch(e) {}
+    } else if (v === null) {
       const cls = classifySpotifyPlayerError(lastSpotifyError);
       if (cls === 'no_active_device' || cls === 'device_not_found' || cls === 'not_found') {
         log('Keep-Alive: Spotify inaktiv – öffne Spotify empfohlen', 'warn', { lastSpotifyError });
@@ -1740,6 +1764,8 @@ async function init() {
   const code = params.get('code');
   if (code) {
     log('OAuth Callback empfangen', 'info');
+    // Clear URL immediately to avoid reusing an expired code on refresh/back
+    try { window.history.replaceState({}, '', window.location.pathname); } catch(e) {}
     await handleSpotifyCallback(code);
     return;
   }
