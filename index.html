@@ -138,10 +138,15 @@
     <div class="home-icon">&#127925;</div>
     <div class="home-text">Scanne den QR-Code oder gib die Kartennummer ein.</div>
     <button class="btn btn-primary" onclick="startScanner()">&#128247; QR-Code scannen</button>
+    <button class="btn btn-secondary btn-small" onclick="openDevicePanel()">&#128266; Spotify-Ger&auml;te</button>
     <div class="or-divider">oder</div>
     <div class="manual-input-row">
       <input type="number" id="manualInput" min="1" max="30" placeholder="Nr." inputmode="numeric">
       <button class="btn btn-secondary btn-small" onclick="playManual()">&#9654; Play</button>
+    </div>
+    <div style="display:flex;gap:10px;width:100%;max-width:300px;justify-content:center;margin-top:8px">
+      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="toggleDebug()">Debug-Log</button>
+      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="exportLog()">Log exportieren</button>
     </div>
     <button class="btn btn-small" style="background:none;color:var(--text-dim);margin-top:8px" onclick="spotifyLogout()">
       Spotify trennen
@@ -167,6 +172,7 @@
     <div class="playing-status"><div class="pulse-dot"></div> Wird abgespielt...</div>
     <div id="playError" class="error-msg" style="display:none"></div>
     <button class="btn btn-primary" onclick="showHome()" style="margin-top:8px">&#127912; N&auml;chste Karte</button>
+    <button class="btn btn-secondary btn-small" onclick="openDevicePanel()">&#128266; Ger&auml;te</button>
     <button class="btn btn-small" style="background:none;color:var(--text-dim)" onclick="stopPlayback()">
       &#9724; Stopp
     </button>
@@ -181,6 +187,26 @@
     <h2 style="font-size:18px">Alle 30 Songs</h2>
     <div class="song-grid" id="songGrid"></div>
     <button class="btn btn-secondary btn-small" onclick="showHome()" style="margin-top:8px">&#8592; Zur&uuml;ck</button>
+  </div>
+
+  <!-- DEVICES -->
+  <div id="screen-devices" class="screen">
+    <h2 style="font-size:18px">Spotify-Ger&auml;te</h2>
+    <div class="setup-box" style="margin-top:8px">
+      <h3>Tipps</h3>
+      <ol>
+        <li>&Ouml;ffne die Spotify-App auf dem Zielger&auml;t (Handy/Desktop).</li>
+        <li>Starte kurz einen beliebigen Song und pausiere wieder.</li>
+        <li>Klicke dann hier auf <code>Ger&auml;te aktualisieren</code>.</li>
+      </ol>
+      <button class="btn btn-spotify btn-small" style="margin-top:10px" onclick="openSpotifyApp()">Spotify &ouml;ffnen</button>
+    </div>
+    <div class="song-grid" id="deviceGrid" style="margin-top:10px"></div>
+    <div style="display:flex;gap:10px;width:100%;max-width:380px">
+      <button class="btn btn-secondary btn-small" onclick="refreshDevices()">Ger&auml;te aktualisieren</button>
+      <button class="btn btn-primary btn-small" onclick="showHome()">Fertig</button>
+    </div>
+    <div class="debug-log" id="debugLogDevices"></div>
   </div>
 </div>
 
@@ -233,17 +259,114 @@ const SPOTIFY_CLIENT_ID = '818547f9235c471da830c418b8bea2e8';
 let spotifyClientId = SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SCOPES = 'user-modify-playback-state user-read-playback-state';
+let preferredDeviceId = null;
+let debugEnabled = true;
+let lastSpotifyError = null;
+const LOG_KEY = 'hitster_log_v1';
+const DEBUG_KEY = 'hitster_debug_v1';
+const DEVICE_KEY = 'hitster_preferred_device_v1';
+
+// ══════════════════════════════════════════════
+// UTIL
+// ══════════════════════════════════════════════
+function safeJsonStringify(obj) {
+  try { return JSON.stringify(obj); } catch { return String(obj); }
+}
+
+function nowIso() {
+  try { return new Date().toISOString(); } catch { return String(Date.now()); }
+}
+
+function getEnvInfo() {
+  return {
+    ts: nowIso(),
+    href: window.location.href,
+    origin: window.location.origin,
+    ua: navigator.userAgent,
+    platform: navigator.platform,
+    lang: navigator.language,
+    secure: window.isSecureContext,
+    visibility: document.visibilityState,
+  };
+}
+
+async function fetchWithTimeout(url, opts, timeoutMs = 9000) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 // ══════════════════════════════════════════════
 // DEBUG LOG
 // ══════════════════════════════════════════════
-function log(msg, type = '') {
-  const line = `<div class="${type}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
-  ['debugLog','debugLogScan','debugLogSetup','debugLogPlay'].forEach(id => {
+function persistLog(entry) {
+  try {
+    const raw = localStorage.getItem(LOG_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    arr.push(entry);
+    // keep last ~400 entries
+    while (arr.length > 400) arr.shift();
+    localStorage.setItem(LOG_KEY, JSON.stringify(arr));
+  } catch {}
+}
+
+function setDebugVisible(visible) {
+  debugEnabled = !!visible;
+  try { localStorage.setItem(DEBUG_KEY, debugEnabled ? '1' : '0'); } catch {}
+  document.querySelectorAll('.debug-log').forEach(el => {
+    el.style.display = debugEnabled ? '' : 'none';
+  });
+}
+
+function exportLog() {
+  let payload = { env: getEnvInfo(), entries: [] };
+  try {
+    const raw = localStorage.getItem(LOG_KEY);
+    payload.entries = raw ? JSON.parse(raw) : [];
+  } catch {}
+  const text = safeJsonStringify(payload);
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `hitster-log-${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function toggleDebug() { setDebugVisible(!debugEnabled); }
+
+function log(msg, type = '', data = null) {
+  const ts = new Date();
+  const entry = {
+    t: ts.toISOString(),
+    level: type || 'info',
+    msg: String(msg),
+    data: data ?? undefined,
+  };
+  persistLog(entry);
+
+  const time = ts.toLocaleTimeString();
+  const extra = data == null ? '' : ` <span style="color:#666">(${safeJsonStringify(data)})</span>`;
+  const line = `<div class="${type}">[${time}] ${entry.msg}${extra}</div>`;
+  ['debugLog','debugLogScan','debugLogSetup','debugLogPlay','debugLogDevices'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.innerHTML += line; el.scrollTop = el.scrollHeight; }
   });
 }
+
+window.addEventListener('error', (e) => {
+  log('JS Fehler: ' + (e?.message || 'unbekannt'), 'err', { file: e?.filename, line: e?.lineno, col: e?.colno });
+});
+window.addEventListener('unhandledrejection', (e) => {
+  log('Unhandled Promise Rejection', 'err', { reason: String(e?.reason || '') });
+});
 
 // ══════════════════════════════════════════════
 // SPOTIFY PKCE OAuth
@@ -399,6 +522,7 @@ function spotifyLogout() {
     sessionStorage.removeItem('hitster_token');
     sessionStorage.removeItem('hitster_refresh');
     sessionStorage.removeItem('hitster_client_id');
+    localStorage.removeItem(DEVICE_KEY);
   } catch(e) {}
   showScreen('screen-setup');
 }
@@ -406,123 +530,146 @@ function spotifyLogout() {
 // ══════════════════════════════════════════════
 // SPOTIFY PLAYBACK CONTROL (Connect API)
 // ══════════════════════════════════════════════
-async function spotifyApi(endpoint, method = 'GET', body = null) {
+function showPlayError(msg, data = null) {
+  const el = document.getElementById('playError');
+  el.textContent = msg;
+  el.style.display = '';
+  if (data) log('Play-Fehlerdetails', 'err', data);
+}
+
+function clearPlayError() {
+  const el = document.getElementById('playError');
+  el.style.display = 'none';
+  el.textContent = '';
+}
+
+async function spotifyApi(endpoint, method = 'GET', body = null, options = {}) {
   if (!spotifyToken) { log('Kein Token', 'err'); return null; }
+  const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 9000;
+  const url = 'https://api.spotify.com/v1' + endpoint;
 
   const opts = {
     method,
     headers: { 'Authorization': 'Bearer ' + spotifyToken },
   };
-  if (body) {
+  if (body !== null && body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
 
-  let resp = await fetch('https://api.spotify.com/v1' + endpoint, opts);
+  const started = performance.now();
+  let resp;
+  try {
+    resp = await fetchWithTimeout(url, opts, timeoutMs);
+  } catch (e) {
+    lastSpotifyError = { endpoint, method, kind: 'network', message: e?.name === 'AbortError' ? 'timeout' : String(e?.message || e) };
+    log('Spotify Netzwerkfehler (' + lastSpotifyError.message + ')', 'err', lastSpotifyError);
+    return null;
+  } finally {
+    const ms = Math.round(performance.now() - started);
+    log('Spotify API ' + method + ' ' + endpoint + ' (' + ms + 'ms)', 'info');
+  }
 
-  // Token expired? Try refresh
+  // Token expired? Try refresh once
   if (resp.status === 401) {
     log('Token abgelaufen, erneuere...', 'warn');
     const refreshed = await refreshToken();
-    if (refreshed) {
-      opts.headers['Authorization'] = 'Bearer ' + spotifyToken;
-      resp = await fetch('https://api.spotify.com/v1' + endpoint, opts);
-    } else {
+    if (!refreshed) {
       log('Token-Erneuerung fehlgeschlagen. Bitte neu verbinden.', 'err');
       spotifyLogout();
       return null;
     }
+    opts.headers['Authorization'] = 'Bearer ' + spotifyToken;
+    try {
+      resp = await fetchWithTimeout(url, opts, timeoutMs);
+    } catch (e) {
+      lastSpotifyError = { endpoint, method, kind: 'network_after_refresh', message: String(e?.message || e) };
+      log('Spotify Netzwerkfehler nach Refresh', 'err', lastSpotifyError);
+      return null;
+    }
   }
 
-  if (resp.status === 204) return {}; // No content = success for PUT
+  if (resp.status === 204) return { __status: 204 }; // no active device for GET /me/player; success for many PUTs
+
+  let data = null;
+  try { data = await resp.json(); } catch { data = {}; }
+
   if (!resp.ok) {
-    const errData = await resp.json().catch(() => ({}));
-    log('API Fehler ' + resp.status + ': ' + JSON.stringify(errData), 'err');
+    lastSpotifyError = { endpoint, method, status: resp.status, data };
+    log('Spotify API Fehler ' + resp.status, 'err', lastSpotifyError);
     return null;
   }
-  return await resp.json().catch(() => ({}));
+  return data;
 }
 
-async function getActiveDevice(retries = 3) {
+function normalizeDevice(d) {
+  if (!d) return null;
+  return {
+    id: d.id,
+    name: d.name || 'Unbekannt',
+    type: d.type || '',
+    is_active: !!d.is_active,
+    volume_percent: typeof d.volume_percent === 'number' ? d.volume_percent : null,
+  };
+}
+
+async function getDevices(retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
-    log('Suche Spotify-Geräte (Versuch ' + attempt + '/' + retries + ')...', 'info');
+    log('Lade Spotify-Geräte (Versuch ' + attempt + '/' + retries + ')...', 'info');
     const data = await spotifyApi('/me/player/devices');
-    if (data && data.devices && data.devices.length > 0) {
-      const active = data.devices.find(d => d.is_active);
-      const device = active || data.devices[0];
-      log('Gerät gefunden: ' + device.name + ' (' + device.type + ')', 'info');
-      return device;
+    const list = (data && Array.isArray(data.devices)) ? data.devices.map(normalizeDevice).filter(Boolean) : [];
+    if (list.length > 0) {
+      log('Geräte: ' + list.length, 'info', list.map(d => ({ name: d.name, type: d.type, active: d.is_active, id: d.id })));
+      return list;
     }
-    if (attempt < retries) {
-      log('Noch keine Geräte, warte 2s...', 'warn');
-      await new Promise(r => setTimeout(r, 2000));
-    }
+    if (attempt < retries) await new Promise(r => setTimeout(r, 1500));
   }
 
-  // Last resort: try to get current playback state (sometimes devices endpoint is empty but player works)
-  log('Versuche direkten Player-Zugriff...', 'info');
-  const playerState = await spotifyApi('/me/player');
-  if (playerState && playerState.device) {
-    log('Gerät via Player gefunden: ' + playerState.device.name, 'info');
-    return playerState.device;
+  // Fallback: /me/player returns 204 if no active device; otherwise includes device
+  const player = await spotifyApi('/me/player');
+  if (player && player.device) {
+    const dev = normalizeDevice(player.device);
+    if (dev) return [dev];
   }
-
-  log('Keine Spotify-Geräte nach ' + retries + ' Versuchen.', 'err');
-  return null;
+  log('Keine Spotify-Geräte gefunden', 'err', { lastSpotifyError });
+  return [];
 }
 
 async function startPlayback(spotifyTrackId) {
-  const device = await getActiveDevice();
+  clearPlayError();
 
   const trackBody = { uris: ['spotify:track:' + spotifyTrackId], position_ms: 0 };
 
-  // Strategie 1: Ohne device_id (Spotify wählt aktives Gerät)
-  log('Versuch 1: Play ohne device_id...', 'info');
-  let result = await spotifyApi('/me/player/play', 'PUT', trackBody);
-  if (result !== null) {
-    log('Wiedergabe gestartet (auto device)', 'info');
-    document.getElementById('playError').style.display = 'none';
-    return true;
+  const devices = await getDevices(2);
+  const preferred = preferredDeviceId ? devices.find(d => d.id === preferredDeviceId) : null;
+  const active = devices.find(d => d.is_active);
+  const chosen = preferred || active || devices[0] || null;
+
+  if (!chosen) {
+    showPlayError('Kein Spotify-Gerät gefunden. Öffne Spotify auf einem Gerät, starte kurz einen Song und aktualisiere dann die Geräte.', { lastSpotifyError });
+    return false;
   }
 
-  // Strategie 2: Mit expliziter device_id
-  if (device) {
-    log('Versuch 2: Play auf ' + device.name + '...', 'info');
-    result = await spotifyApi('/me/player/play?device_id=' + device.id, 'PUT', trackBody);
-    if (result !== null) {
-      log('Wiedergabe gestartet auf ' + device.name, 'info');
-      document.getElementById('playError').style.display = 'none';
-      return true;
-    }
+  // Try to make chosen device active, then play on it
+  if (chosen.id && !chosen.is_active) {
+    log('Transfer zu Gerät: ' + chosen.name, 'info', { id: chosen.id });
+    await spotifyApi('/me/player', 'PUT', { device_ids: [chosen.id], play: false });
+    await new Promise(r => setTimeout(r, 800));
   }
 
-  // Strategie 3: Transfer playback zum Gerät, dann play
-  if (device) {
-    log('Versuch 3: Transfer + Play...', 'info');
-    const transfer = await spotifyApi('/me/player', 'PUT', {
-      device_ids: [device.id],
-      play: false
-    });
-    if (transfer !== null) {
-      await new Promise(r => setTimeout(r, 1000));
-      result = await spotifyApi('/me/player/play?device_id=' + device.id, 'PUT', trackBody);
-      if (result !== null) {
-        log('Wiedergabe gestartet nach Transfer', 'info');
-        document.getElementById('playError').style.display = 'none';
-        return true;
-      }
-    }
+  // Strategie 1: Mit device_id (stabiler, wenn Zielgerät bekannt ist)
+  if (chosen.id) {
+    log('Play auf Gerät: ' + chosen.name, 'info');
+    const result = await spotifyApi('/me/player/play?device_id=' + encodeURIComponent(chosen.id), 'PUT', trackBody);
+    if (result !== null) { log('Wiedergabe gestartet', 'info'); return true; }
   }
 
-  // Alles fehlgeschlagen
-  if (!device) {
-    document.getElementById('playError').textContent =
-      'Kein Spotify-Gerät gefunden. Öffne die Spotify-App, spiele kurz etwas ab, und versuche es dann erneut.';
-  } else {
-    document.getElementById('playError').textContent =
-      'Wiedergabe fehlgeschlagen. Öffne Spotify, spiele kurz etwas ab, und versuche es nochmal.';
-  }
-  document.getElementById('playError').style.display = '';
+  // Strategie 2: Ohne device_id (Spotify entscheidet)
+  log('Fallback: Play ohne device_id...', 'warn');
+  const r2 = await spotifyApi('/me/player/play', 'PUT', trackBody);
+  if (r2 !== null) { log('Wiedergabe gestartet (auto device)', 'info'); return true; }
+
+  showPlayError('Wiedergabe fehlgeschlagen. Öffne Spotify, spiele kurz etwas ab, und versuche es erneut (ggf. Gerät im Geräte-Menü auswählen).', { chosen, lastSpotifyError });
   return false;
 }
 
@@ -548,14 +695,138 @@ function showHome() {
   document.getElementById('manualInput').value = '';
 }
 
+function openSpotifyApp() {
+  log('Öffne Spotify (falls installiert)...', 'info');
+  try { window.open('https://open.spotify.com', '_blank'); } catch(e) {}
+}
+
+function openDevicePanel() {
+  if (isScanning) stopScanner();
+  document.getElementById('debugLogDevices').innerHTML = '';
+  showScreen('screen-devices');
+  refreshDevices();
+}
+
+function setPreferredDevice(id) {
+  preferredDeviceId = id || null;
+  try {
+    if (preferredDeviceId) localStorage.setItem(DEVICE_KEY, preferredDeviceId);
+    else localStorage.removeItem(DEVICE_KEY);
+  } catch(e) {}
+  log('Bevorzugtes Gerät gesetzt', 'info', { preferredDeviceId });
+  // re-render marker
+  refreshDevices(1);
+}
+
+function renderDevices(devices) {
+  const grid = document.getElementById('deviceGrid');
+  if (!devices || devices.length === 0) {
+    grid.innerHTML = `<div class="error-msg">Keine Geräte sichtbar. Öffne Spotify auf einem Gerät, starte kurz einen Song und aktualisiere.</div>`;
+    return;
+  }
+
+  const html = devices.map(d => {
+    const isPref = preferredDeviceId && d.id === preferredDeviceId;
+    const badge = d.is_active ? 'AKTIV' : (isPref ? 'ZIEL' : '');
+    const badgeStyle = d.is_active ? 'background:rgba(74,222,128,0.15);color:var(--success);' : (isPref ? 'background:rgba(233,69,96,0.15);color:var(--accent);' : 'color:var(--text-dim);');
+    const safeId = String(d.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `
+      <div class="song-item" style="cursor:pointer" onclick="setPreferredDevice('${safeId}')">
+        <div class="song-num">${d.is_active ? '●' : '○'}</div>
+        <div style="flex:1">
+          <div class="song-title">${d.name}</div>
+          <div class="song-artist">${d.type}${d.volume_percent !== null ? ' · Vol ' + d.volume_percent + '%' : ''}</div>
+        </div>
+        <div class="song-year" style="${badgeStyle}">${badge || '&nbsp;'}</div>
+      </div>`;
+  }).join('');
+  grid.innerHTML = html;
+}
+
+async function refreshDevices(retries = 2) {
+  document.getElementById('deviceGrid').innerHTML = '';
+  const devices = await getDevices(retries);
+  renderDevices(devices);
+}
+
 // ══════════════════════════════════════════════
 // QR SCANNER
 // ══════════════════════════════════════════════
-function startScanner() {
+let lastScanText = '';
+let lastScanAt = 0;
+
+function extractCardNumber(raw) {
+  if (!raw) return null;
+  const text = String(raw).trim();
+
+  // 1) URL parsing (query + path)
+  try {
+    const u = new URL(text);
+    const qp = u.searchParams.get('card') || u.searchParams.get('karte') || u.searchParams.get('c');
+    if (qp) {
+      const n = parseInt(qp, 10);
+      if (n >= 1 && n <= 30) return n;
+    }
+    // last path segment that is 1-2 digits
+    const segs = u.pathname.split('/').filter(Boolean);
+    for (let i = segs.length - 1; i >= 0; i--) {
+      if (/^\d{1,2}$/.test(segs[i])) {
+        const n = parseInt(segs[i], 10);
+        if (n >= 1 && n <= 30) return n;
+      }
+    }
+  } catch {}
+
+  // 2) explicit patterns in text
+  const m1 = text.match(/[?&](?:card|karte|c)=(\d{1,2})/i);
+  if (m1) {
+    const n = parseInt(m1[1], 10);
+    if (n >= 1 && n <= 30) return n;
+  }
+  const m2 = text.match(/(?:HITSTER|H\+|KARTE|CARD)[^\d]{0,10}(\d{1,2})/i);
+  if (m2) {
+    const n = parseInt(m2[1], 10);
+    if (n >= 1 && n <= 30) return n;
+  }
+
+  // 3) plain number
+  if (/^\d{1,2}$/.test(text)) {
+    const n = parseInt(text, 10);
+    if (n >= 1 && n <= 30) return n;
+  }
+
+  return null;
+}
+
+async function startScanner() {
   showScreen('screen-scan');
   document.getElementById('debugLogScan').innerHTML = '';
-  log('Scanner wird gestartet...', 'info');
+  log('Scanner wird gestartet...', 'info', { secure: window.isSecureContext, host: window.location.hostname });
   scanProcessing = false;
+  lastScanText = '';
+  lastScanAt = 0;
+
+  const host = window.location.hostname;
+  const isLocal = host === 'localhost' || host === '127.0.0.1';
+  if (!window.isSecureContext && !isLocal) {
+    log('Kamera benötigt HTTPS oder localhost.', 'err');
+    alert('QR-Scan funktioniert nur über HTTPS oder localhost (wegen Kamera-Sicherheit).');
+    showHome();
+    return;
+  }
+  if (!window.Html5Qrcode) {
+    log('QR-Library fehlt (html5-qrcode).', 'err');
+    alert('QR-Scanner konnte nicht geladen werden.');
+    showHome();
+    return;
+  }
+
+  try {
+    const cams = await Html5Qrcode.getCameras();
+    log('Kameras gefunden: ' + (cams?.length || 0), 'info', cams?.map(c => ({ id: c.id, label: c.label })) || []);
+  } catch (e) {
+    log('Kamera-Liste nicht verfügbar: ' + String(e?.message || e), 'warn');
+  }
 
   scanner = new Html5Qrcode("qr-reader");
   isScanning = true;
@@ -564,7 +835,11 @@ function startScanner() {
     { facingMode: "environment" },
     { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
     (decodedText) => {
-      log('QR erkannt: "' + decodedText + '"', 'info');
+      const now = Date.now();
+      if (decodedText === lastScanText && (now - lastScanAt) < 1200) return;
+      lastScanText = decodedText;
+      lastScanAt = now;
+      log('QR erkannt', 'info', { text: String(decodedText).slice(0, 120) });
       onScanSuccess(decodedText);
     },
     () => {}
@@ -586,23 +861,11 @@ function stopScanner() {
 function onScanSuccess(decodedText) {
   if (scanProcessing) return;
   scanProcessing = true;
-  let cardNum = null;
-
-  const urlMatch = decodedText.match(/[?&]card=(\d{1,2})/i);
-  if (urlMatch) { cardNum = parseInt(urlMatch[1]); log('URL -> Karte ' + cardNum, 'info'); }
-
-  if (!cardNum) {
-    const textMatch = decodedText.match(/HITSTER-?(\d{1,2})/i);
-    if (textMatch) { cardNum = parseInt(textMatch[1]); log('HITSTER -> Karte ' + cardNum, 'info'); }
-  }
-
-  if (!cardNum) {
-    const n = parseInt(decodedText.trim());
-    if (n >= 1 && n <= 30) { cardNum = n; log('Zahl -> Karte ' + cardNum, 'info'); }
-  }
+  const cardNum = extractCardNumber(decodedText);
 
   if (cardNum && cardNum >= 1 && cardNum <= 30) {
     log('Starte Karte ' + cardNum, 'info');
+    try { navigator.vibrate?.(50); } catch {}
     if (scanner && isScanning) {
       scanner.stop().then(() => { scanner.clear(); isScanning = false; playSong(cardNum); })
         .catch(() => { isScanning = false; playSong(cardNum); });
@@ -610,7 +873,7 @@ function onScanSuccess(decodedText) {
       playSong(cardNum);
     }
   } else {
-    log('Kein gueltiger Code: "' + decodedText.substring(0, 60) + '"', 'err');
+    log('Kein gueltiger Code', 'err', { text: String(decodedText).slice(0, 200) });
     scanProcessing = false;
   }
 }
@@ -698,6 +961,13 @@ async function init() {
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('manualInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') playManual(); });
+  try {
+    preferredDeviceId = localStorage.getItem(DEVICE_KEY);
+    const dbg = localStorage.getItem(DEBUG_KEY);
+    if (dbg === '0') debugEnabled = false;
+  } catch(e) {}
+  setDebugVisible(debugEnabled);
+  log('App gestartet', 'info', getEnvInfo());
   init();
 });
 
