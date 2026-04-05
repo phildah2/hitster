@@ -175,6 +175,7 @@
       <div class="card-number" id="playingNumber">?</div>
       <div class="card-label">von 30</div>
     </div>
+    <div id="playingDeviceInfo" style="font-size:12px;color:var(--text-dim);max-width:340px;text-align:center"></div>
     <div class="playing-status"><div class="pulse-dot"></div> Wird abgespielt...</div>
     <div id="playError" class="error-msg" style="display:none"></div>
     <button class="btn btn-primary" onclick="showHome()" style="margin-top:8px">&#127912; N&auml;chste Karte</button>
@@ -266,11 +267,13 @@ let spotifyClientId = SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SCOPES = 'user-modify-playback-state user-read-playback-state';
 let preferredDeviceId = null;
+let preferredDeviceName = null;
 let debugEnabled = true;
 let lastSpotifyError = null;
 const LOG_KEY = 'hitster_log_v1';
 const DEBUG_KEY = 'hitster_debug_v1';
 const DEVICE_KEY = 'hitster_preferred_device_v1';
+const DEVICE_NAME_KEY = 'hitster_preferred_device_name_v1';
 
 // ══════════════════════════════════════════════
 // UTIL
@@ -693,7 +696,7 @@ async function startPlayback(spotifyTrackId) {
 
   // Critical improvement: if devices endpoint is temporarily empty, still try the saved preferred device_id
   if (!chosen && preferredDeviceId) {
-    chosen = { id: preferredDeviceId, name: 'Gespeichertes Zielgerät', type: 'saved', is_active: false, volume_percent: null, __saved: true };
+    chosen = { id: preferredDeviceId, name: preferredDeviceName || 'Gespeichertes Zielgerät', type: 'saved', is_active: false, volume_percent: null, __saved: true };
     log('Geräteliste leer – nutze gespeichertes Zielgerät trotzdem', 'warn', { preferredDeviceId });
   }
 
@@ -713,16 +716,56 @@ async function startPlayback(spotifyTrackId) {
   if (chosen.id) {
     log('Play auf Gerät: ' + chosen.name, 'info');
     const result = await spotifyApi('/me/player/play?device_id=' + encodeURIComponent(chosen.id), 'PUT', trackBody);
-    if (result !== null) { log('Wiedergabe gestartet', 'info'); return true; }
+    if (result !== null) {
+      log('Wiedergabe gestartet', 'info');
+      await verifyPlayback(chosen);
+      return true;
+    }
   }
 
   // Strategie 2: Ohne device_id (Spotify entscheidet)
   log('Fallback: Play ohne device_id...', 'warn');
   const r2 = await spotifyApi('/me/player/play', 'PUT', trackBody);
-  if (r2 !== null) { log('Wiedergabe gestartet (auto device)', 'info'); return true; }
+  if (r2 !== null) {
+    log('Wiedergabe gestartet (auto device)', 'info');
+    await verifyPlayback(null);
+    return true;
+  }
 
   showPlayError('Wiedergabe fehlgeschlagen. Öffne Spotify, spiele kurz etwas ab, und versuche es erneut (ggf. Gerät im Geräte-Menü auswählen).', { chosen, lastSpotifyError });
   return false;
+}
+
+async function verifyPlayback(expectedDevice) {
+  const el = document.getElementById('playingDeviceInfo');
+  if (el) el.textContent = 'Prüfe Spotify-Status...';
+
+  const state = await spotifyApi('/me/player');
+  if (state && state.__status === 204) {
+    if (el) el.textContent = 'Spotify meldet: kein aktives Gerät / keine laufende Wiedergabe.';
+    log('Playback-Status: 204 (kein aktiver Player)', 'warn');
+    return;
+  }
+  if (!state) {
+    if (el) el.textContent = 'Spotify-Status konnte nicht gelesen werden (siehe Log).';
+    return;
+  }
+
+  const dev = state.device ? normalizeDevice(state.device) : null;
+  const isPlaying = !!state.is_playing;
+  const devName = dev?.name || 'unbekannt';
+  const devId = dev?.id || null;
+  const item = state.item ? { name: state.item.name, artists: (state.item.artists || []).map(a => a.name).join(', ') } : null;
+
+  if (el) {
+    const txt = `Gerät: ${devName}${isPlaying ? ' · spielt' : ' · pausiert'}${item ? ` · Track: ${item.name}` : ''}`;
+    el.textContent = txt;
+  }
+  log('Playback-Status', 'info', { isPlaying, device: dev, item });
+
+  if (expectedDevice?.id && devId && expectedDevice.id !== devId) {
+    showPlayError('Es spielt auf einem anderen Gerät: ' + devName + '. Wähle im Geräte-Menü dein iPhone als Zielgerät.', { expectedDevice, actualDevice: dev });
+  }
 }
 
 async function stopPlayback() {
@@ -745,6 +788,8 @@ function showHome() {
   scanProcessing = false;
   showScreen('screen-home');
   document.getElementById('manualInput').value = '';
+  const info = document.getElementById('playingDeviceInfo');
+  if (info) info.textContent = '';
 }
 
 function openSpotifyApp() {
@@ -759,13 +804,15 @@ function openDevicePanel() {
   refreshDevices();
 }
 
-function setPreferredDevice(id) {
+function setPreferredDevice(id, name = null) {
   preferredDeviceId = id || null;
+  if (typeof name === 'string' && name.trim()) preferredDeviceName = name.trim();
   try {
     if (preferredDeviceId) localStorage.setItem(DEVICE_KEY, preferredDeviceId);
     else localStorage.removeItem(DEVICE_KEY);
+    if (preferredDeviceName) localStorage.setItem(DEVICE_NAME_KEY, preferredDeviceName);
   } catch(e) {}
-  log('Bevorzugtes Gerät gesetzt', 'info', { preferredDeviceId });
+  log('Bevorzugtes Gerät gesetzt', 'info', { preferredDeviceId, preferredDeviceName });
   updateSpotifyBadge();
   // re-render marker
   refreshDevices(1);
@@ -779,7 +826,11 @@ function updateSpotifyBadge() {
     el.style.color = 'var(--text-dim)';
     return;
   }
-  const deviceTxt = preferredDeviceId ? (' &middot; Zielger&auml;t: ' + preferredDeviceId.slice(0, 6) + '…') : '';
+  let deviceTxt = '';
+  if (preferredDeviceId) {
+    const label = preferredDeviceName ? preferredDeviceName : (preferredDeviceId.slice(0, 6) + '…');
+    deviceTxt = ' &middot; Zielger&auml;t: ' + label;
+  }
   el.innerHTML = '&#9679; Spotify verbunden' + deviceTxt;
   el.style.color = '#1DB954';
 }
@@ -790,7 +841,7 @@ function renderDevices(devices) {
 
   // If we have a preferred device id but it is currently not listed, show it as "saved"
   if (preferredDeviceId && !list.some(d => d && d.id === preferredDeviceId)) {
-    list.unshift({ id: preferredDeviceId, name: 'Gespeichertes Zielgerät (derzeit nicht sichtbar)', type: 'saved', is_active: false, volume_percent: null, __saved: true });
+    list.unshift({ id: preferredDeviceId, name: preferredDeviceName || 'Gespeichertes Zielgerät (derzeit nicht sichtbar)', type: 'saved', is_active: false, volume_percent: null, __saved: true });
   }
 
   if (!list.length) {
@@ -803,9 +854,10 @@ function renderDevices(devices) {
     const badge = d.is_active ? 'AKTIV' : (isPref ? 'ZIEL' : '');
     const badgeStyle = d.is_active ? 'background:rgba(74,222,128,0.15);color:var(--success);' : (isPref ? 'background:rgba(233,69,96,0.15);color:var(--accent);' : 'color:var(--text-dim);');
     const safeId = String(d.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const safeName = String(d.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const sub = d.__saved ? 'gespeichert · tippen um zu behalten' : `${d.type}${d.volume_percent !== null ? ' · Vol ' + d.volume_percent + '%' : ''}`;
     return `
-      <div class="song-item" style="cursor:pointer" onclick="setPreferredDevice('${safeId}')">
+      <div class="song-item" style="cursor:pointer" onclick="setPreferredDevice('${safeId}','${safeName}')">
         <div class="song-num">${d.is_active ? '●' : '○'}</div>
         <div style="flex:1">
           <div class="song-title">${d.name}</div>
@@ -1038,6 +1090,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('manualInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') playManual(); });
   try {
     preferredDeviceId = localStorage.getItem(DEVICE_KEY);
+    preferredDeviceName = localStorage.getItem(DEVICE_NAME_KEY);
     const dbg = localStorage.getItem(DEBUG_KEY);
     if (dbg === '0') debugEnabled = false;
   } catch(e) {}
