@@ -141,7 +141,7 @@
 
 <div class="header">
   <h1>HITSTER<span>+</span></h1>
-  <div class="subtitle">Erweiterungsset &middot; 30 Karten</div>
+  <div class="subtitle">Erweiterungsset &middot; 60 Karten</div>
   <div class="build-info" id="buildInfo">Version: …</div>
 </div>
 
@@ -172,7 +172,7 @@
         <div class="more-body">
           <div class="or-divider" style="margin-top:2px">Manuell</div>
           <div class="manual-input-row">
-            <input type="number" id="manualInput" min="1" max="30" placeholder="Nr." inputmode="numeric">
+            <input type="number" id="manualInput" min="1" max="60" placeholder="Nr." inputmode="numeric">
             <button class="btn btn-secondary btn-small" onclick="playManual()">&#9654; Play</button>
           </div>
 
@@ -209,9 +209,10 @@
     <div class="playing-card">
       <div class="card-label">Karte</div>
       <div class="card-number" id="playingNumber">?</div>
-      <div class="card-label">von 30</div>
+      <div class="card-label">von 60</div>
     </div>
     <div id="playingDeviceInfo" style="font-size:12px;color:var(--text-dim);max-width:340px;text-align:center"></div>
+    <button id="openSpotifyPlayBtn" class="btn btn-spotify btn-small" style="display:none" onclick="openSpotifyApp()">Spotify &ouml;ffnen</button>
     <div class="playing-status"><div class="pulse-dot"></div> Wird abgespielt...</div>
     <div id="playError" class="error-msg" style="display:none"></div>
     <button class="btn btn-primary" onclick="nextCard()" style="margin-top:8px">&#127912; N&auml;chste Karte</button>
@@ -225,7 +226,7 @@
 
   <!-- SONG LIST -->
   <div id="screen-songs" class="screen">
-    <h2 style="font-size:18px">Alle 30 Songs</h2>
+    <h2 style="font-size:18px">Alle 60 Songs</h2>
     <div class="song-grid" id="songGrid"></div>
     <button class="btn btn-secondary btn-small" onclick="showHome()" style="margin-top:8px">&#8592; Zur&uuml;ck</button>
   </div>
@@ -288,6 +289,38 @@ const SONGS = [
   { id:28, year:2023, title:"Dance The Night",          artist:"Dua Lipa",                        spotify:"1vYXt7VSjH9JIM5oRRo7vA" },
   { id:29, year:2024, title:"Espresso",                 artist:"Sabrina Carpenter",               spotify:"2qSkIjg1o9h3YT9RAgYN75" },
   { id:30, year:2024, title:"Die With A Smile",         artist:"Lady Gaga & Bruno Mars",          spotify:"2plbrEY59IikOBgBGLjaoe" },
+
+  // ── SET 2 (Karten 31-60) ──
+  { id:31, year:2015, title:"Lean On",                  artist:"Major Lazer & DJ Snake",          spotify:"4vS8VaBwJJV5Ry7UFIQuoo" },
+  { id:32, year:2015, title:"Sorry",                    artist:"Justin Bieber",                   spotify:"09CtPGIpYB4BrO8qb1RGsF" },
+  { id:33, year:2016, title:"Can't Stop the Feeling",   artist:"Justin Timberlake",               spotify:"6JV2JOEocMgcZxYSZelKcc" },
+  { id:34, year:2016, title:"Stitches",                 artist:"Shawn Mendes",                    spotify:"5jsw9uXEGuKyJzs0boZ1bT" },
+  { id:35, year:2016, title:"Love Yourself",            artist:"Justin Bieber",                   spotify:"50kpGaPAhYJ3sGmk6vplg0" },
+  { id:36, year:2016, title:"Hymn for the Weekend",     artist:"Coldplay",                        spotify:"3RiPr603aXAoi4GHyXx0uy" },
+  { id:37, year:2017, title:"Attention",                artist:"Charlie Puth",                    spotify:"2bKS7HtZ9Cy4K7NGeRlePF" },
+  { id:38, year:2017, title:"Thunder",                  artist:"Imagine Dragons",                 spotify:"1zB4vmk8tFRmM9UULNzbLB" },
+  { id:39, year:2017, title:"Believer",                 artist:"Imagine Dragons",                 spotify:"7Izh7zLJGw1Nscd62Exxj4" },
+  { id:40, year:2017, title:"Rockabye",                 artist:"Clean Bandit ft. Sean Paul",      spotify:"2p6abUiYyIYQZ5zcCDYw3P" },
+  { id:41, year:2018, title:"Girls Like You",           artist:"Maroon 5 ft. Cardi B",            spotify:"04GKRudrMjdPdX10873SAM" },
+  { id:42, year:2018, title:"Happier",                  artist:"Marshmello ft. Bastille",         spotify:"7A2T2WQNf77r2Kx4ZznWi8" },
+  { id:43, year:2018, title:"No Tears Left to Cry",     artist:"Ariana Grande",                   spotify:"2qT1uLXPVPzGgFOx4jtEuo" },
+  { id:44, year:2018, title:"Flames",                   artist:"David Guetta & Sia",              spotify:"33IOhptvC2Qoy2UhjiHXLV" },
+  { id:45, year:2019, title:"Sucker",                   artist:"Jonas Brothers",                  spotify:"4y3OI86AEP6PQoDE6olYhO" },
+  { id:46, year:2019, title:"7 Rings",                  artist:"Ariana Grande",                   spotify:"6ocbgoVGwYJhOv1GgI9NsF" },
+  { id:47, year:2019, title:"Memories",                 artist:"Maroon 5",                        spotify:"4cktbXiXOapiLBMprHFErI" },
+  { id:48, year:2019, title:"Auf das was da noch kommt",artist:"Lotte & Max Giesinger",           spotify:"6P072lM4omnqxGBGOHZQSc" },
+  { id:49, year:2020, title:"Physical",                 artist:"Dua Lipa",                        spotify:"3AzjcOeAmA57TIOr9zF1ZW" },
+  { id:50, year:2020, title:"Mood",                     artist:"24kGoldn ft. Iann Dior",          spotify:"74UDlgnfGM7B5pS21YO7Uw" },
+  { id:51, year:2020, title:"Kings & Queens",           artist:"Ava Max",                         spotify:"7a53HqqArd4b9NF4XAmlbI" },
+  { id:52, year:2020, title:"Breaking Me",              artist:"Topic & A7S",                     spotify:"5R3uerwwKwVvl5bPcMe2Fh" },
+  { id:53, year:2021, title:"Peaches",                  artist:"Justin Bieber",                   spotify:"4iJyoBOLtHqaGxP12qzhQI" },
+  { id:54, year:2021, title:"Drivers License",          artist:"Olivia Rodrigo",                  spotify:"21AnJxT70z4QNkFXDNWz7Y" },
+  { id:55, year:2021, title:"Montero",                  artist:"Lil Nas X",                       spotify:"67BtfxlNbhBmCDR2L2l8qd" },
+  { id:56, year:2021, title:"Easy On Me",               artist:"Adele",                           spotify:"0gplL1WMoJ6iYaPgMCL0gX" },
+  { id:57, year:2022, title:"Anti-Hero",                artist:"Taylor Swift",                    spotify:"0V3wPSX9ygBnCm8psDIegu" },
+  { id:58, year:2022, title:"Unholy",                   artist:"Sam Smith & Kim Petras",          spotify:"3nqQXoyQOWXiESFLlDF1hG" },
+  { id:59, year:2022, title:"Running Up That Hill",     artist:"Kate Bush",                       spotify:"29d0nY7TzCoi22XBqDQkiP" },
+  { id:60, year:2023, title:"Vampire",                  artist:"Olivia Rodrigo",                  spotify:"3k79jB4aGmMDUQzEwa46Rz" },
 ];
 
 // ══════════════════════════════════════════════
@@ -303,12 +336,16 @@ const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SCOPES = 'user-modify-playback-state user-read-playback-state';
 let preferredDeviceId = null;
 let preferredDeviceName = null;
+let lastGoodDeviceId = null;
+let lastGoodDeviceName = null;
 let debugEnabled = true;
 let lastSpotifyError = null;
 const LOG_KEY = 'hitster_log_v1';
 const DEBUG_KEY = 'hitster_debug_v1';
 const DEVICE_KEY = 'hitster_preferred_device_v1';
 const DEVICE_NAME_KEY = 'hitster_preferred_device_name_v1';
+const LAST_DEVICE_KEY = 'hitster_last_device_v1';
+const LAST_DEVICE_NAME_KEY = 'hitster_last_device_name_v1';
 
 // ══════════════════════════════════════════════
 // UTIL
@@ -632,6 +669,8 @@ function clearPlayError() {
   const el = document.getElementById('playError');
   el.style.display = 'none';
   el.textContent = '';
+  const b = document.getElementById('openSpotifyPlayBtn');
+  if (b) b.style.display = 'none';
 }
 
 async function spotifyApi(endpoint, method = 'GET', body = null, options = {}) {
@@ -733,6 +772,17 @@ async function getDevices(retries = 3) {
     const list = (data && Array.isArray(data.devices)) ? data.devices.map(normalizeDevice).filter(Boolean) : [];
     if (list.length > 0) {
       log('Geräte: ' + list.length, 'info', list.map(d => ({ name: d.name, type: d.type, active: d.is_active, id: d.id })));
+
+      // Remember a good default device (prefer non-web-player active devices)
+      const best = pickBestDevice(list);
+      if (best?.id && !isWebPlayerDevice(best)) {
+        lastGoodDeviceId = best.id;
+        lastGoodDeviceName = best.name || null;
+        try {
+          localStorage.setItem(LAST_DEVICE_KEY, lastGoodDeviceId);
+          if (lastGoodDeviceName) localStorage.setItem(LAST_DEVICE_NAME_KEY, lastGoodDeviceName);
+        } catch(e) {}
+      }
       return list;
     }
     if (attempt < retries) await new Promise(r => setTimeout(r, 1500));
@@ -766,6 +816,11 @@ async function startPlayback(spotifyTrackId) {
     chosen = preferred || { id: preferredDeviceId, name: preferredDeviceName || 'Gespeichertes Zielgerät', type: 'saved', is_active: false, volume_percent: null, __saved: true };
   } else {
     chosen = pickBestDevice(devices);
+    // If Spotify devices are temporarily empty, try last known good device (usually iPhone)
+    if (!chosen && lastGoodDeviceId) {
+      chosen = { id: lastGoodDeviceId, name: lastGoodDeviceName || 'Letztes Gerät', type: 'saved', is_active: false, volume_percent: null, __saved: true };
+      log('Nutze letztes bekanntes Gerät', 'warn', { lastGoodDeviceId });
+    }
   }
 
   // Critical improvement: if devices endpoint is temporarily empty, still try the saved preferred device_id
@@ -774,7 +829,9 @@ async function startPlayback(spotifyTrackId) {
   }
 
   if (!chosen) {
-    showPlayError('Kein Spotify-Gerät gefunden. Öffne Spotify auf einem Gerät, starte kurz einen Song und aktualisiere dann die Geräte.', { lastSpotifyError });
+    showPlayError('Kein Spotify-Gerät gefunden. Öffne Spotify auf deinem iPhone, starte kurz einen Song und versuche es erneut.', { lastSpotifyError });
+    const b = document.getElementById('openSpotifyPlayBtn');
+    if (b) b.style.display = '';
     return false;
   }
 
@@ -817,13 +874,15 @@ async function startPlayback(spotifyTrackId) {
 async function verifyPlayback(expectedDevice, trackId = null) {
   const el = document.getElementById('playingDeviceInfo');
   if (el) el.textContent = 'Prüfe Spotify-Status...';
+  const openBtn = document.getElementById('openSpotifyPlayBtn');
 
   // Poll a few times: Spotify sometimes reports is_playing=false right after play.
   const attempts = 5;
   for (let i = 1; i <= attempts; i++) {
     const state = await spotifyApi('/me/player');
     if (state && state.__status === 204) {
-      if (el) el.textContent = 'Spotify meldet: kein aktives Gerät / keine laufende Wiedergabe.';
+      if (el) el.textContent = 'Spotify meldet: kein aktives Gerät. Öffne Spotify und starte kurz einen Song.';
+      if (openBtn) openBtn.style.display = '';
       log('Playback-Status: 204 (kein aktiver Player)', 'warn');
       if (i < attempts) await new Promise(r => setTimeout(r, 350));
       continue;
@@ -1003,14 +1062,14 @@ function extractCardNumber(raw) {
     const qp = u.searchParams.get('card') || u.searchParams.get('karte') || u.searchParams.get('c');
     if (qp) {
       const n = parseInt(qp, 10);
-      if (n >= 1 && n <= 30) return n;
+      if (n >= 1 && n <= 60) return n;
     }
     // last path segment that is 1-2 digits
     const segs = u.pathname.split('/').filter(Boolean);
     for (let i = segs.length - 1; i >= 0; i--) {
       if (/^\d{1,2}$/.test(segs[i])) {
         const n = parseInt(segs[i], 10);
-        if (n >= 1 && n <= 30) return n;
+        if (n >= 1 && n <= 60) return n;
       }
     }
   } catch {}
@@ -1019,18 +1078,18 @@ function extractCardNumber(raw) {
   const m1 = text.match(/[?&](?:card|karte|c)=(\d{1,2})/i);
   if (m1) {
     const n = parseInt(m1[1], 10);
-    if (n >= 1 && n <= 30) return n;
+    if (n >= 1 && n <= 60) return n;
   }
   const m2 = text.match(/(?:HITSTER|H\+|KARTE|CARD)[^\d]{0,10}(\d{1,2})/i);
   if (m2) {
     const n = parseInt(m2[1], 10);
-    if (n >= 1 && n <= 30) return n;
+    if (n >= 1 && n <= 60) return n;
   }
 
   // 3) plain number
   if (/^\d{1,2}$/.test(text)) {
     const n = parseInt(text, 10);
-    if (n >= 1 && n <= 30) return n;
+    if (n >= 1 && n <= 60) return n;
   }
 
   return null;
@@ -1101,7 +1160,7 @@ function onScanSuccess(decodedText) {
   scanProcessing = true;
   const cardNum = extractCardNumber(decodedText);
 
-  if (cardNum && cardNum >= 1 && cardNum <= 30) {
+  if (cardNum && cardNum >= 1 && cardNum <= 60) {
     log('Starte Karte ' + cardNum, 'info');
     try { navigator.vibrate?.(50); } catch {}
     if (scanner && isScanning) {
@@ -1141,7 +1200,7 @@ async function playSong(cardNum) {
 // ══════════════════════════════════════════════
 function playManual() {
   const num = parseInt(document.getElementById('manualInput').value);
-  if (num >= 1 && num <= 30) { log('Manuell: Karte ' + num, 'info'); playSong(num); }
+  if (num >= 1 && num <= 60) { log('Manuell: Karte ' + num, 'info'); playSong(num); }
 }
 
 // ══════════════════════════════════════════════
@@ -1162,7 +1221,7 @@ async function init() {
   const cardParam = params.get('card');
   if (cardParam) {
     const cardNum = parseInt(cardParam);
-    if (cardNum >= 1 && cardNum <= 30) {
+    if (cardNum >= 1 && cardNum <= 60) {
       window.history.replaceState({}, '', window.location.pathname);
       // Save pending card for after login
       try { sessionStorage.setItem('hitster_pending_card', cardNum.toString()); } catch(e) {}
@@ -1202,6 +1261,8 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     preferredDeviceId = localStorage.getItem(DEVICE_KEY);
     preferredDeviceName = localStorage.getItem(DEVICE_NAME_KEY);
+    lastGoodDeviceId = localStorage.getItem(LAST_DEVICE_KEY);
+    lastGoodDeviceName = localStorage.getItem(LAST_DEVICE_NAME_KEY);
     const dbg = localStorage.getItem(DEBUG_KEY);
     if (dbg === '0') debugEnabled = false;
   } catch(e) {}
