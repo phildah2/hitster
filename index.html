@@ -167,7 +167,7 @@
 
 <div class="header">
   <h1>HITSTER<span>+</span></h1>
-  <div class="subtitle">Erweiterungsset &middot; 60 Karten</div>
+  <div class="subtitle">Erweiterungsset &middot; 120 Karten</div>
   <div class="build-info" id="buildInfo">Version: …</div>
 </div>
 
@@ -211,7 +211,7 @@
         <div class="more-body">
           <div class="or-divider" style="margin-top:2px">Manuell</div>
           <div class="manual-input-row">
-            <input type="number" id="manualInput" min="1" max="60" placeholder="Nr." inputmode="numeric">
+            <input type="number" id="manualInput" min="1" max="120" placeholder="Nr." inputmode="numeric">
             <button class="btn btn-secondary btn-small" onclick="playManual()">&#9654; Play</button>
           </div>
 
@@ -257,10 +257,11 @@
     <div class="playing-card">
       <div class="card-label">Karte</div>
       <div class="card-number" id="playingNumber">?</div>
-      <div class="card-label">von 60</div>
+      <div class="card-label">von 120</div>
     </div>
     <div id="playingDeviceInfo" style="font-size:12px;color:var(--text-dim);max-width:340px;text-align:center"></div>
     <button id="openSpotifyPlayBtn" class="btn btn-spotify btn-small" style="display:none" onclick="openSpotifyApp()">Spotify &ouml;ffnen</button>
+    <button id="openTrackBtn" class="btn btn-spotify btn-small" style="display:none" onclick="openCurrentTrack()">Song in Spotify &ouml;ffnen</button>
     <div class="playing-status"><div class="pulse-dot"></div> Wird abgespielt...</div>
     <div id="playError" class="error-msg" style="display:none"></div>
     <button class="btn btn-primary" onclick="nextCard()" style="margin-top:8px">&#127912; N&auml;chste Karte</button>
@@ -273,7 +274,7 @@
 
   <!-- SONG LIST -->
   <div id="screen-songs" class="screen">
-    <h2 style="font-size:18px">Alle 60 Songs</h2>
+    <h2 style="font-size:18px">Alle 120 Songs</h2>
     <div class="song-grid" id="songGrid"></div>
     <button class="btn btn-secondary btn-small" onclick="showHome()" style="margin-top:8px">&#8592; Zur&uuml;ck</button>
   </div>
@@ -368,6 +369,70 @@ const SONGS = [
   { id:58, year:2022, title:"Unholy",                   artist:"Sam Smith & Kim Petras",          spotify:"3nqQXoyQOWXiESFLlDF1hG" },
   { id:59, year:2022, title:"Running Up That Hill",     artist:"Kate Bush",                       spotify:"29d0nY7TzCoi22XBqDQkiP" },
   { id:60, year:2023, title:"Vampire",                  artist:"Olivia Rodrigo",                  spotify:"3k79jB4aGmMDUQzEwa46Rz" },
+
+  // ── SET 3: 2000er Edition (Karten 61-90) ──
+  { id:61, year:2000, title:"Mambo No. 5",                artist:"Lou Bega",                        spotify:"1CNXRcdXBJicIy9DcOZOC3" },
+  { id:62, year:2000, title:"Blue (Da Ba Dee)",            artist:"Eiffel 65",                       spotify:"00wuAhZkp4CkkGNC40Ybc2" },
+  { id:63, year:2000, title:"Who Let the Dogs Out",        artist:"Baha Men",                        spotify:"4ojwshILTd7u7CYTnrrtYr" },
+  { id:64, year:2000, title:"It's My Life",                artist:"Bon Jovi",                        spotify:"0v1XpBHnsbkCn7iJ9Ucr1l" },
+  { id:65, year:2000, title:"Teenage Dirtbag",             artist:"Wheatus",                         spotify:"3LI4MmibTkXH5cGpCGZgyw" },
+  { id:66, year:2001, title:"Whenever, Wherever",          artist:"Shakira",                         spotify:"2lnzGkdtDj5mtlcOW2yRtG" },
+  { id:67, year:2001, title:"Can't Get You Out of My Head",artist:"Kylie Minogue",                   spotify:"3E7ZwUMJFqpsDOJzEkBrQ7" },
+  { id:68, year:2005, title:"Hung Up",                     artist:"Madonna",                         spotify:"70VjMtwhm3Q2HBQeJnPfmh" },
+  { id:69, year:2003, title:"In da Club",                  artist:"50 Cent",                         spotify:"7iL6o9tox1zgHpKUfh9vuC" },
+  { id:70, year:2003, title:"Crazy in Love",               artist:"Beyoncé",                         spotify:"3ZoJkzTVb06mOQll4ewdUp" },
+  { id:71, year:2003, title:"Hey Ya!",                     artist:"OutKast",                         spotify:"2PpruBYCo4H7WOBJ7Q2EwM" },
+  { id:72, year:2004, title:"Toxic",                       artist:"Britney Spears",                  spotify:"6I9VzXrHxO9rA9A5euc8Ak" },
+  { id:73, year:2004, title:"Yeah!",                       artist:"Usher ft. Lil Jon",               spotify:"5rb9QrpfcKFHM1EUbSIurX" },
+  { id:74, year:2004, title:"Mr. Brightside",              artist:"The Killers",                     spotify:"2RvbnvBX3XKkHy8daq3PUT" },
+  { id:75, year:2004, title:"Boulevard of Broken Dreams",  artist:"Green Day",                       spotify:"5GorCbAP4aL0EJ16frG2hd" },
+  { id:76, year:2004, title:"Since U Been Gone",           artist:"Kelly Clarkson",                  spotify:"6Xa4zJMt02mBHC83WIuKJU" },
+  { id:77, year:2005, title:"Don't Cha",                   artist:"The Pussycat Dolls",              spotify:"3lut9PIaXGN7zoJMj4vLgE" },
+  { id:78, year:2006, title:"Hips Don't Lie",              artist:"Shakira",                         spotify:"3ZFTkvIE7kyPt6Nu3PEa7V" },
+  { id:79, year:2006, title:"Crazy",                       artist:"Gnarls Barkley",                  spotify:"2N5zMZX7YeL1tico8oQxa9" },
+  { id:80, year:2006, title:"SOS",                         artist:"Rihanna",                         spotify:"30cSNer6TV8x2utjULVeQ5" },
+  { id:81, year:2007, title:"Umbrella",                    artist:"Rihanna",                         spotify:"49FYlytm3dAAraYgpoJZux" },
+  { id:82, year:2007, title:"Beautiful Girls",             artist:"Sean Kingston",                   spotify:"6a8oA8B5JOeZR47X3itVlA" },
+  { id:83, year:2007, title:"Stronger",                    artist:"Kanye West",                      spotify:"22gTtlluiom4UR1G5vR4M3" },
+  { id:84, year:2008, title:"Bleeding Love",               artist:"Leona Lewis",                     spotify:"0rt0sVy8DXkZPxIL0D0iwN" },
+  { id:85, year:2008, title:"I Kissed a Girl",             artist:"Katy Perry",                      spotify:"005lwxGU1tms6HGELIcUv9" },
+  { id:86, year:2008, title:"Viva la Vida",                artist:"Coldplay",                        spotify:"1mea3bSkSGXuIRvnydlB5b" },
+  { id:87, year:2009, title:"Poker Face",                  artist:"Lady Gaga",                       spotify:"1QV6tiMFM6fSOKOGLMHYYg" },
+  { id:88, year:2009, title:"I Gotta Feeling",             artist:"Black Eyed Peas",                 spotify:"2H1047e0oMSj10dgp7p2VG" },
+  { id:89, year:2009, title:"Boom Boom Pow",               artist:"Black Eyed Peas",                 spotify:"3opVsyWVYEAFK9bJAG8Opa" },
+  { id:90, year:2009, title:"Jai Ho",                      artist:"A.R. Rahman & Pussycat Dolls",    spotify:"78vx0P848U86qnvA5jIeh9" },
+
+  // ── Set 4 – Punkrock & Post Punk (91-120) ──
+  { id:91,  year:1976, title:"Blitzkrieg Bop",                    artist:"Ramones",                        spotify:"1RMfmiaqMkv7GegDh53zlE" },
+  { id:92,  year:1976, title:"Anarchy in the U.K.",               artist:"Sex Pistols",                    spotify:"3LoDeIbiR12sAznmpNEmKA" },
+  { id:93,  year:1977, title:"God Save the Queen",                artist:"Sex Pistols",                    spotify:"2mHchPRtQWet3iIS3jANr1" },
+  { id:94,  year:1977, title:"Sheena Is a Punk Rocker",           artist:"Ramones",                        spotify:"3brXgpgQNsUMe4gZeZijHY" },
+  { id:95,  year:1978, title:"Ever Fallen in Love",               artist:"Buzzcocks",                      spotify:"5YUJMvTg4AWHKjqQidTsGK" },
+  { id:96,  year:1979, title:"London Calling",                    artist:"The Clash",                      spotify:"124Y9LPRCAz3q2OP0iCvcJ" },
+  { id:97,  year:1982, title:"Should I Stay or Should I Go",      artist:"The Clash",                      spotify:"1nNaIV2U3QWJ1cJCiMkFo6" },
+  { id:98,  year:1982, title:"Rock the Casbah",                   artist:"The Clash",                      spotify:"4dQQHqd2JWbG5sxWvGc5SQ" },
+  { id:99,  year:1980, title:"Holiday in Cambodia",               artist:"Dead Kennedys",                  spotify:"6ZR7gzHIvcj4qvo5q4kqXN" },
+  { id:100, year:1978, title:"Teenage Kicks",                     artist:"The Undertones",                 spotify:"7ATyLePQnHxFk5kzxWCcsh" },
+  { id:101, year:1980, title:"Love Will Tear Us Apart",           artist:"Joy Division",                   spotify:"5UOyuoPV5htsByI6iDSBL7" },
+  { id:102, year:1979, title:"Transmission",                      artist:"Joy Division",                   spotify:"4quX6Y6cvrP9hY4hiZBHiG" },
+  { id:103, year:1980, title:"A Forest",                          artist:"The Cure",                       spotify:"00Amd2EiGo17YoZyOjk3VV" },
+  { id:104, year:1992, title:"Friday I'm in Love",                artist:"The Cure",                       spotify:"263aNAQCeFSWipk896byo6" },
+  { id:105, year:1989, title:"Lovesong",                          artist:"The Cure",                       spotify:"7K71prYWuwcWwbgfHVQJdq" },
+  { id:106, year:1979, title:"Heart of Glass",                    artist:"Blondie",                        spotify:"6usdcwtJ69KvOjQuA1WT89" },
+  { id:107, year:1979, title:"Bela Lugosi's Dead",                artist:"Bauhaus",                        spotify:"0JfWS5txNJcbTHnJavTImO" },
+  { id:108, year:1981, title:"Ghost Town",                        artist:"The Specials",                   spotify:"6ewN9MaFbi78oDLT9wYDgn" },
+  { id:109, year:1977, title:"Lust for Life",                     artist:"Iggy Pop",                       spotify:"21YxK0klhpfLW8budkJaMF" },
+  { id:110, year:1980, title:"Once in a Lifetime",                artist:"Talking Heads",                  spotify:"1Tr4K5MU5XYE44umXGDndd" },
+  { id:111, year:1977, title:"Psycho Killer",                     artist:"Talking Heads",                  spotify:"7dSCxR4LqkmxoBrq9MzVSD" },
+  { id:112, year:1994, title:"Basket Case",                       artist:"Green Day",                      spotify:"5WV3VC4GG0BQist1o3Wmyv" },
+  { id:113, year:1994, title:"Self Esteem",                       artist:"The Offspring",                  spotify:"6qpN7PrkVsP3N3xO7WlCaw" },
+  { id:114, year:1998, title:"Pretty Fly for a White Guy",        artist:"The Offspring",                  spotify:"3SFXsFpeGmBTtQvKiwYMDA" },
+  { id:115, year:1999, title:"All the Small Things",              artist:"blink-182",                      spotify:"2m1hi0nfMR9vdGC8UcrnwU" },
+  { id:116, year:2001, title:"Fat Lip",                           artist:"Sum 41",                         spotify:"4KacUpvbA3Mfo05gttTjhN" },
+  { id:117, year:2004, title:"American Idiot",                    artist:"Green Day",                      spotify:"6cXKUiFa8i7OUD0s4FKXsO" },
+  { id:118, year:2005, title:"I Bet You Look Good on the Dancefloor", artist:"Arctic Monkeys",            spotify:"3DQVgcqaP3iSMbaKsd57l5" },
+  { id:119, year:1978, title:"Roxanne",                           artist:"The Police",                     spotify:"3EYOJ48Et32uATr9ZmLnAo" },
+  { id:120, year:2004, title:"Take Me Out",                       artist:"Franz Ferdinand",                spotify:"20I8RduZC2PWMWTDCZuuAN" },
 ];
 
 // ══════════════════════════════════════════════
@@ -380,7 +445,8 @@ let spotifyToken = null;
 const SPOTIFY_CLIENT_ID = '818547f9235c471da830c418b8bea2e8';
 let spotifyClientId = SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = window.location.origin + window.location.pathname;
-const SCOPES = 'user-modify-playback-state user-read-playback-state';
+// user-read-private helps us show account/product diagnostics (e.g. Premium vs free)
+const SCOPES = 'user-modify-playback-state user-read-playback-state user-read-private';
 let preferredDeviceId = null;
 let preferredDeviceName = null;
 let lastGoodDeviceId = null;
@@ -391,6 +457,8 @@ let keepAlivePrevVolume = null;
 let keepAliveDeviceId = null;
 let debugEnabled = true;
 let lastSpotifyError = null;
+let spotifyProfile = null;
+let currentTrackSpotifyId = null;
 const LOG_KEY = 'hitster_log_v1';
 const DEBUG_KEY = 'hitster_debug_v1';
 const DEVICE_KEY = 'hitster_preferred_device_v1';
@@ -649,6 +717,9 @@ async function handleSpotifyCallback(code) {
       } else {
         showScreen('screen-home');
       }
+
+      // Load profile + refresh status in background
+      fetchSpotifyProfile().finally(() => refreshDevices(1));
     } else {
       log('Token-Fehler: ' + JSON.stringify(data), 'err');
       // Clean URL (avoid repeated invalid_grant on refresh/back)
@@ -728,12 +799,36 @@ function clearPlayError() {
   el.textContent = '';
   const b = document.getElementById('openSpotifyPlayBtn');
   if (b) b.style.display = 'none';
+  const t = document.getElementById('openTrackBtn');
+  if (t) t.style.display = 'none';
 }
 
 function setKeepAlive(enabled) {
   keepAliveEnabled = !!enabled;
   try { localStorage.setItem(KEEP_ALIVE_KEY, keepAliveEnabled ? '1' : '0'); } catch(e) {}
   log('Keep-Alive ' + (keepAliveEnabled ? 'aktiviert' : 'deaktiviert'), 'info');
+}
+
+function openSpotifyTrack(trackId) {
+  if (!trackId) return;
+  const deepLink = 'spotify:track:' + trackId;
+  log('Öffne Spotify Track...', 'info', { deepLink });
+
+  let didHide = false;
+  const onVis = () => { if (document.visibilityState === 'hidden') didHide = true; };
+  document.addEventListener('visibilitychange', onVis, { once: true });
+
+  try { window.location.href = deepLink; } catch(e) {}
+
+  setTimeout(() => {
+    try { document.removeEventListener('visibilitychange', onVis); } catch {}
+    if (didHide) return;
+    try { window.open('https://open.spotify.com/track/' + trackId, '_blank'); } catch(e) {}
+  }, 1500);
+}
+
+function openCurrentTrack() {
+  if (currentTrackSpotifyId) openSpotifyTrack(currentTrackSpotifyId);
 }
 
 async function spotifyApi(endpoint, method = 'GET', body = null, options = {}) {
@@ -784,15 +879,45 @@ async function spotifyApi(endpoint, method = 'GET', body = null, options = {}) {
 
   if (resp.status === 204) return { __status: 204 }; // no active device for GET /me/player; success for many PUTs
 
+  // Read body safely (Spotify sometimes returns empty bodies)
+  let rawText = '';
+  try { rawText = await resp.text(); } catch {}
   let data = null;
-  try { data = await resp.json(); } catch { data = {}; }
+  if (rawText) {
+    try { data = JSON.parse(rawText); } catch { data = { raw: rawText }; }
+  } else {
+    data = {};
+  }
 
   if (!resp.ok) {
-    lastSpotifyError = { endpoint, method, status: resp.status, data };
+    lastSpotifyError = {
+      endpoint,
+      method,
+      status: resp.status,
+      data,
+      headers: {
+        'www-authenticate': resp.headers.get('www-authenticate'),
+        'content-type': resp.headers.get('content-type'),
+      },
+    };
     log('Spotify API Fehler ' + resp.status, 'err', lastSpotifyError);
     return null;
   }
   return data;
+}
+
+async function fetchSpotifyProfile() {
+  // Best-effort profile fetch for diagnostics; requires user-read-private for "product".
+  const me = await spotifyApi('/me');
+  if (!me) return null;
+  spotifyProfile = {
+    id: me.id,
+    display_name: me.display_name,
+    product: me.product,
+    country: me.country,
+  };
+  log('Spotify Profil', 'info', spotifyProfile);
+  return spotifyProfile;
 }
 
 async function tryRestoreVolumeIfNeeded() {
@@ -890,6 +1015,17 @@ async function getDevices(retries = 3) {
 async function startPlayback(spotifyTrackId) {
   clearPlayError();
   await tryRestoreVolumeIfNeeded();
+
+  if (spotifyProfile?.product && spotifyProfile.product !== 'premium') {
+    // Free-mode: we can't remote-control playback; open the track in Spotify instead.
+    currentTrackSpotifyId = spotifyTrackId;
+    const el = document.getElementById('playingDeviceInfo');
+    if (el) el.textContent = 'Spotify Free: öffne den Song in Spotify und drücke Play.';
+    const t = document.getElementById('openTrackBtn');
+    if (t) t.style.display = '';
+    openSpotifyTrack(spotifyTrackId);
+    return false;
+  }
 
   const trackBody = { uris: ['spotify:track:' + spotifyTrackId], position_ms: 0 };
 
@@ -1006,6 +1142,13 @@ async function verifyPlayback(expectedDevice, trackId = null) {
 }
 
 async function stopPlayback() {
+  // Free-mode: nothing to keep alive / pause via API; just return to home.
+  if (spotifyProfile?.product && spotifyProfile.product !== 'premium') {
+    log('Stopp (Free-Mode)', 'info', { product: spotifyProfile.product });
+    showHome();
+    return;
+  }
+
   if (!keepAliveEnabled) {
     await spotifyApi('/me/player/pause', 'PUT');
     log('Wiedergabe pausiert', 'info');
@@ -1123,6 +1266,27 @@ function updateSpotifyStatus(devices = null) {
   if (!spotifyToken) {
     statusValue.textContent = 'Nicht verbunden';
     hint.textContent = 'Verbinde Spotify in den Optionen.';
+    wakeBtn.style.display = 'none';
+    sel.style.display = 'none';
+    refreshBtn.style.display = 'none';
+    return;
+  }
+
+  // Hard error: Spotify forbids player APIs (often wrong account, missing Premium, or restricted token)
+  if (lastSpotifyError?.status === 403 && String(lastSpotifyError.endpoint || '').includes('/me/player')) {
+    statusValue.textContent = 'Zugriff verweigert (403)';
+    const who = spotifyProfile?.display_name ? `Angemeldet als ${spotifyProfile.display_name}. ` : '';
+    const prod = spotifyProfile?.product ? `Produkt: ${spotifyProfile.product}. ` : '';
+    hint.textContent = who + prod + 'Spotify blockiert die Player-API. Mit Free funktioniert Auto-Play nicht; bitte Premium nutzen oder einen Premium-Account verbinden.';
+    wakeBtn.style.display = 'none';
+    sel.style.display = 'none';
+    refreshBtn.style.display = '';
+    return;
+  }
+
+  if (spotifyProfile?.product && spotifyProfile.product !== 'premium') {
+    statusValue.textContent = 'Premium erforderlich';
+    hint.textContent = `Produkt: ${spotifyProfile.product}. Spotify Free: Scans &ouml;ffnen den Song in Spotify (kein Auto-Play in der App).`;
     wakeBtn.style.display = 'none';
     sel.style.display = 'none';
     refreshBtn.style.display = 'none';
@@ -1294,34 +1458,34 @@ function extractCardNumber(raw) {
     const qp = u.searchParams.get('card') || u.searchParams.get('karte') || u.searchParams.get('c');
     if (qp) {
       const n = parseInt(qp, 10);
-      if (n >= 1 && n <= 60) return n;
+      if (n >= 1 && n <= 120) return n;
     }
     // last path segment that is 1-2 digits
     const segs = u.pathname.split('/').filter(Boolean);
     for (let i = segs.length - 1; i >= 0; i--) {
-      if (/^\d{1,2}$/.test(segs[i])) {
+      if (/^\d{1,3}$/.test(segs[i])) {
         const n = parseInt(segs[i], 10);
-        if (n >= 1 && n <= 60) return n;
+        if (n >= 1 && n <= 120) return n;
       }
     }
   } catch {}
 
   // 2) explicit patterns in text
-  const m1 = text.match(/[?&](?:card|karte|c)=(\d{1,2})/i);
+  const m1 = text.match(/[?&](?:card|karte|c)=(\d{1,3})/i);
   if (m1) {
     const n = parseInt(m1[1], 10);
-    if (n >= 1 && n <= 60) return n;
+    if (n >= 1 && n <= 120) return n;
   }
-  const m2 = text.match(/(?:HITSTER|H\+|KARTE|CARD)[^\d]{0,10}(\d{1,2})/i);
+  const m2 = text.match(/(?:HITSTER|H\+|KARTE|CARD)[^\d]{0,10}(\d{1,3})/i);
   if (m2) {
     const n = parseInt(m2[1], 10);
-    if (n >= 1 && n <= 60) return n;
+    if (n >= 1 && n <= 120) return n;
   }
 
   // 3) plain number
-  if (/^\d{1,2}$/.test(text)) {
+  if (/^\d{1,3}$/.test(text)) {
     const n = parseInt(text, 10);
-    if (n >= 1 && n <= 60) return n;
+    if (n >= 1 && n <= 120) return n;
   }
 
   return null;
@@ -1392,7 +1556,7 @@ function onScanSuccess(decodedText) {
   scanProcessing = true;
   const cardNum = extractCardNumber(decodedText);
 
-  if (cardNum && cardNum >= 1 && cardNum <= 60) {
+  if (cardNum && cardNum >= 1 && cardNum <= 120) {
     log('Starte Karte ' + cardNum, 'info');
     try { navigator.vibrate?.(50); } catch {}
     if (scanner && isScanning) {
@@ -1417,6 +1581,7 @@ async function playSong(cardNum) {
   log('Karte ' + cardNum + ' – starte Spotify Wiedergabe...', 'info');
   document.getElementById('playingNumber').textContent = cardNum;
   document.getElementById('playError').style.display = 'none';
+  currentTrackSpotifyId = song.spotify;
   showScreen('screen-playing');
 
   const success = await startPlayback(song.spotify);
@@ -1432,7 +1597,7 @@ async function playSong(cardNum) {
 // ══════════════════════════════════════════════
 function playManual() {
   const num = parseInt(document.getElementById('manualInput').value);
-  if (num >= 1 && num <= 60) { log('Manuell: Karte ' + num, 'info'); playSong(num); }
+  if (num >= 1 && num <= 120) { log('Manuell: Karte ' + num, 'info'); playSong(num); }
 }
 
 // ══════════════════════════════════════════════
@@ -1453,7 +1618,7 @@ async function init() {
   const cardParam = params.get('card');
   if (cardParam) {
     const cardNum = parseInt(cardParam);
-    if (cardNum >= 1 && cardNum <= 60) {
+    if (cardNum >= 1 && cardNum <= 120) {
       window.history.replaceState({}, '', window.location.pathname);
       // Save pending card for after login
       try { sessionStorage.setItem('hitster_pending_card', cardNum.toString()); } catch(e) {}
@@ -1469,6 +1634,9 @@ async function init() {
       spotifyClientId = savedClientId;
       log('Session wiederhergestellt', 'info');
 
+      // Load profile + status in background
+      fetchSpotifyProfile().finally(() => refreshDevices(1));
+
       // Check if there's a pending card
       const pendingCard = sessionStorage.getItem('hitster_pending_card');
       if (pendingCard) {
@@ -1479,8 +1647,6 @@ async function init() {
       }
 
       showScreen('screen-home');
-      // Initial status refresh in background
-      refreshDevices(1);
       return;
     }
   } catch(e) {}
