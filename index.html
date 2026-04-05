@@ -17,9 +17,9 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg); color: var(--text);
-    min-height: 100dvh; display: flex; flex-direction: column;
+    min-height: 100vh; display: flex; flex-direction: column;
   }
-  .header { text-align: center; padding: 16px 16px 8px; }
+  .header { text-align: center; padding: 16px 16px 8px; flex-shrink: 0; }
   .header h1 { font-size: 28px; font-weight: 800; letter-spacing: 2px; }
   .header h1 span { color: var(--accent); }
   .header .subtitle { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
@@ -49,7 +49,6 @@
   .btn-secondary { background: var(--card-bg); color: var(--text); border: 2px solid rgba(255,255,255,0.1); }
   .btn-small { padding: 10px 20px; font-size: 14px; border-radius: 10px; }
 
-  /* QR Scanner */
   #qr-reader { width: 100%; max-width: 320px; border-radius: 16px; overflow: hidden; background: #000; }
   #qr-reader video { border-radius: 16px; }
   #qr-reader__scan_region { border: none !important; }
@@ -57,7 +56,6 @@
   #qr-reader img[alt="Info icon"] { display: none !important; }
   #qr-reader__header_message { display: none !important; }
 
-  /* Manual Input */
   .manual-input-row { display: flex; gap: 10px; align-items: center; justify-content: center; }
   .manual-input-row input {
     width: 80px; padding: 12px; border: 2px solid rgba(255,255,255,0.15);
@@ -67,7 +65,6 @@
   .manual-input-row input:focus { border-color: var(--accent); }
   .or-divider { color: var(--text-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; }
 
-  /* Playing Screen */
   .playing-card {
     background: var(--card-bg); border-radius: 24px; padding: 32px 24px;
     width: 100%; max-width: 300px;
@@ -78,26 +75,24 @@
   .pulse-dot { width: 12px; height: 12px; background: var(--success); border-radius: 50%; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
 
-  /* Spotify Embed - off-screen but audible */
-  #spotify-embed-container {
-    position: fixed; left: -9999px; top: -9999px;
-    width: 300px; height: 152px;
-    pointer-events: none;
+  /* Spacer pushes embed below visible area */
+  .scroll-spacer { height: 60vh; flex-shrink: 0; }
+  .embed-area {
+    width: 100%; max-width: 320px; border-radius: 12px; overflow: hidden;
+    opacity: 0.3;
   }
+  .embed-label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
 
-  /* Debug Log */
   .debug-log {
     background: #000; border: 1px solid #333; border-radius: 10px;
     padding: 10px; width: 100%; max-width: 380px;
     font-family: monospace; font-size: 11px; color: #0f0;
-    max-height: 120px; overflow-y: auto; text-align: left;
-    word-break: break-all;
+    max-height: 100px; overflow-y: auto; text-align: left; word-break: break-all;
   }
   .debug-log .err { color: #f55; }
   .debug-log .warn { color: #fa0; }
   .debug-log .info { color: #0af; }
 
-  /* Song List */
   .song-grid { display: grid; grid-template-columns: 1fr; gap: 6px; width: 100%; max-height: 55vh; overflow-y: auto; }
   .song-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg2); border-radius: 8px; font-size: 13px; text-align: left; }
   .song-item .song-num { font-weight: 800; color: var(--accent); min-width: 26px; }
@@ -144,12 +139,16 @@
     </div>
     <div class="playing-status"><div class="pulse-dot"></div> Wird abgespielt...</div>
     <div style="font-size:13px;color:var(--text-dim);padding:8px 16px">
-      &#128266; Song wird in Spotify abgespielt.
+      &#128071; Scrolle nach unten zum Player falls die Musik nicht startet.
     </div>
     <button class="btn btn-primary" onclick="showHome()">&#127912; N&auml;chste Karte</button>
     <button class="btn btn-small" style="background:none;color:var(--text-dim)" onclick="showSongList()">
       &#128065; Alle Songs (Spoiler!)
     </button>
+    <!-- Spacer to push embed out of view -->
+    <div class="scroll-spacer"></div>
+    <div class="embed-label">&#9660; Spotify Player (nach unten gescrollt)</div>
+    <div class="embed-area" id="spotify-embed-container"></div>
   </div>
 
   <!-- SONG LIST -->
@@ -162,19 +161,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
-// ── YOUTUBE ID → CARD NUMBER (fuer alte Karten) ──
-const YT_MAP = {
-  "60ItHLz5WEA":1, "pXRviuL6vMY":2, "nYh-n7EOtMA":3, "JGwWNGJdvx8":4,
-  "kJQP7kiw5Fk":5, "FM7MFYoylVs":6, "BQ0mxQXmLsk":7, "W9P_qUnMaFg":8,
-  "bo_efYhYU2A":9, "uSbxCX2LVps":10, "q0hyYWKXF0Q":11, "Pkh8UtuejGw":12,
-  "DyDfgMOUjCI":13, "r7qovpFAGrQ":14, "4NRXx6U8ABQ":15, "E07s5ZYygMg":16,
-  "Fo3DAhiNKQo":17, "gUci-tsiU4I":18, "qP-7GNoDJ5c":19, "kTJczUoc26U":20,
-  "Il0S8BoucSA":21, "TUVcZfQe-Kw":22, "H5v3kku4y6Q":23, "mRD0-GxqHVo":24,
-  "WcIcVapfqXw":25, "G7KNmW9a75Y":26, "0nYDnTTJgFI":27, "OiC1rgCPmUQ":28,
-  "eVli-tstM5E":29, "kPa7bsKwL-c":30,
-};
-
-// ── SONGS ──
 const SONGS = [
   { id:1,  year:2016, title:"Faded",                    artist:"Alan Walker",                     spotify:"698ItKASDavgwZ3WjaWjtz" },
   { id:2,  year:2016, title:"Stressed Out",             artist:"Twenty One Pilots",               spotify:"3CRDbSIZ4r5MsZ0YwxuEkn" },
@@ -208,25 +194,23 @@ const SONGS = [
   { id:30, year:2024, title:"Die With A Smile",         artist:"Lady Gaga & Bruno Mars",          spotify:"2plbrEY59IikOBgBGLjaoe" },
 ];
 
-// ── STATE ──
 let scanner = null;
 let isScanning = false;
-let scanProcessing = false; // prevent double-scan
+let scanProcessing = false;
 
-// ── DEBUG LOG ──
 function log(msg, type = '') {
-  const el = document.getElementById('debugLog');
-  const el2 = document.getElementById('debugLogScan');
   const line = `<div class="${type}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
-  if (el) { el.innerHTML += line; el.scrollTop = el.scrollHeight; }
-  if (el2) { el2.innerHTML += line; el2.scrollTop = el2.scrollHeight; }
-  console.log(msg);
+  ['debugLog','debugLogScan'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.innerHTML += line; el.scrollTop = el.scrollHeight; }
+  });
 }
 
-// ── SCREENS ──
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  // Scroll to top when switching screens
+  window.scrollTo(0, 0);
 }
 function showHome() {
   if (isScanning) stopScanner();
@@ -248,13 +232,11 @@ function startScanner() {
   scanner.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-    (decodedText, decodedResult) => {
+    (decodedText) => {
       log('QR erkannt: "' + decodedText + '"', 'info');
       onScanSuccess(decodedText);
     },
-    (errorMessage) => {
-      // Nur loggen wenn es kein "QR code not found" ist
-    }
+    () => {}
   ).then(() => {
     log('Kamera aktiv. Scanne...', 'info');
   }).catch(err => {
@@ -266,129 +248,76 @@ function startScanner() {
 
 function stopScanner() {
   if (scanner && isScanning) {
-    scanner.stop().then(() => {
-      scanner.clear();
-      isScanning = false;
-      log('Scanner gestoppt.', 'warn');
-    }).catch((e) => {
-      log('Stop-Fehler: ' + e, 'err');
-      isScanning = false;
-    });
+    scanner.stop().then(() => { scanner.clear(); isScanning = false; }).catch(() => { isScanning = false; });
   }
 }
 
 function onScanSuccess(decodedText) {
-  if (scanProcessing) {
-    log('Bereits in Verarbeitung, ignoriere...', 'warn');
-    return;
-  }
+  if (scanProcessing) return;
   scanProcessing = true;
-
   let cardNum = null;
 
   // Format 1: URL mit ?card=XX
   const urlMatch = decodedText.match(/[?&]card=(\d{1,2})/i);
   if (urlMatch) {
     cardNum = parseInt(urlMatch[1]);
-    log('URL-Format erkannt, Karte: ' + cardNum, 'info');
+    log('URL-Format -> Karte ' + cardNum, 'info');
   }
 
   // Format 2: HITSTER-XX
   if (!cardNum) {
     const textMatch = decodedText.match(/HITSTER-?(\d{1,2})/i);
-    if (textMatch) {
-      cardNum = parseInt(textMatch[1]);
-      log('HITSTER-Format erkannt, Karte: ' + cardNum, 'info');
-    }
+    if (textMatch) { cardNum = parseInt(textMatch[1]); log('HITSTER-Format -> Karte ' + cardNum, 'info'); }
   }
 
-  // Format 3: YouTube URL (alte Karten)
+  // Format 3: Nur Zahl
   if (!cardNum) {
-    const ytMatch = decodedText.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-    if (ytMatch) {
-      const ytId = ytMatch[1];
-      log('YouTube-URL erkannt, ID: ' + ytId, 'info');
-      if (YT_MAP[ytId]) {
-        cardNum = YT_MAP[ytId];
-        log('YouTube-ID zugeordnet zu Karte: ' + cardNum, 'info');
-      } else {
-        log('YouTube-ID nicht in Datenbank!', 'err');
-      }
-    }
-  }
-
-  // Format 4: Nur eine Zahl
-  if (!cardNum) {
-    const numOnly = parseInt(decodedText.trim());
-    if (numOnly >= 1 && numOnly <= 30) {
-      cardNum = numOnly;
-      log('Nummer erkannt, Karte: ' + cardNum, 'info');
-    }
+    const n = parseInt(decodedText.trim());
+    if (n >= 1 && n <= 30) { cardNum = n; log('Zahl -> Karte ' + cardNum, 'info'); }
   }
 
   if (cardNum && cardNum >= 1 && cardNum <= 30) {
-    log('Starte Song fuer Karte ' + cardNum + '...', 'info');
-
-    // Scanner stoppen, dann Song abspielen
+    log('Starte Karte ' + cardNum, 'info');
     if (scanner && isScanning) {
-      scanner.stop().then(() => {
-        scanner.clear();
-        isScanning = false;
-        log('Scanner gestoppt, starte Player...', 'info');
-        playSong(cardNum);
-      }).catch(e => {
-        log('Stop-Fehler, spiele trotzdem: ' + e, 'warn');
-        isScanning = false;
-        playSong(cardNum);
-      });
+      scanner.stop().then(() => { scanner.clear(); isScanning = false; playSong(cardNum); })
+        .catch(() => { isScanning = false; playSong(cardNum); });
     } else {
       playSong(cardNum);
     }
   } else {
-    log('Kein gueltiger Karten-Code: "' + decodedText + '"', 'err');
+    log('Kein gueltiger Code: "' + decodedText.substring(0, 60) + '"', 'err');
     scanProcessing = false;
   }
 }
 
-// ── MANUAL INPUT ──
+// ── MANUAL ──
 function playManual() {
-  const input = document.getElementById('manualInput');
-  const num = parseInt(input.value);
-  if (num >= 1 && num <= 30) {
-    log('Manuell: Karte ' + num, 'info');
-    playSong(num);
-  } else {
-    log('Ungueltige Nummer: ' + input.value, 'err');
-    input.style.borderColor = '#e94560';
-    setTimeout(() => input.style.borderColor = 'rgba(255,255,255,0.15)', 1000);
-  }
+  const num = parseInt(document.getElementById('manualInput').value);
+  if (num >= 1 && num <= 30) { log('Manuell: Karte ' + num, 'info'); playSong(num); }
 }
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('manualInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') playManual();
-  });
+  document.getElementById('manualInput').addEventListener('keydown', e => { if (e.key === 'Enter') playManual(); });
 });
 
 // ── PLAY SONG (Spotify Embed - bleibt in der App!) ──
 function playSong(cardNum) {
   const song = SONGS.find(s => s.id === cardNum);
-  if (!song) {
-    log('Song nicht gefunden fuer Karte ' + cardNum, 'err');
-    return;
-  }
+  if (!song) return;
 
-  log('Starte Karte ' + cardNum + ' via Spotify...', 'info');
-
-  // Update playing screen
+  log('Lade Spotify-Embed fuer Karte ' + cardNum, 'info');
   document.getElementById('playingNumber').textContent = cardNum;
   showScreen('screen-playing');
 
-  // Spotify URI öffnet die Spotify-App und spielt automatisch ab
-  const spotifyUri = `spotify:track:${song.spotify}`;
-  log('Oeffne Spotify URI: ' + spotifyUri, 'info');
-  window.location.href = spotifyUri;
+  // Embed Player unterhalb des sichtbaren Bereichs
+  const container = document.getElementById('spotify-embed-container');
+  container.innerHTML = `<iframe
+    src="https://open.spotify.com/embed/track/${song.spotify}?utm_source=generator&theme=0"
+    width="100%" height="152" frameBorder="0"
+    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+    loading="eager"
+    style="border-radius:12px"></iframe>`;
 
-  log('Spotify sollte jetzt abspielen. Handy umdrehen!', 'info');
+  log('Embed geladen. Scrolle runter zum Player um Play zu druecken.', 'info');
 }
 
 // ── URL PARAMETER ──
@@ -397,7 +326,6 @@ function checkUrlParam() {
   const cardParam = params.get('card');
   if (cardParam) {
     const cardNum = parseInt(cardParam);
-    log('URL-Parameter erkannt: card=' + cardParam, 'info');
     if (cardNum >= 1 && cardNum <= 30) {
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => playSong(cardNum), 500);
@@ -408,8 +336,7 @@ document.addEventListener('DOMContentLoaded', checkUrlParam);
 
 // ── SONG LIST ──
 function showSongList() {
-  const grid = document.getElementById('songGrid');
-  grid.innerHTML = SONGS.map(s => `
+  document.getElementById('songGrid').innerHTML = SONGS.map(s => `
     <div class="song-item">
       <div class="song-num">${String(s.id).padStart(2,'0')}</div>
       <div style="flex:1"><div class="song-title">${s.title}</div><div class="song-artist">${s.artist}</div></div>
