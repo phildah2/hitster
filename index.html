@@ -23,6 +23,7 @@
   .header h1 { font-size: 28px; font-weight: 800; letter-spacing: 2px; }
   .header h1 span { color: var(--accent); }
   .header .subtitle { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .header .build-info { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
   .content {
     flex: 1; display: flex; flex-direction: column;
@@ -119,6 +120,7 @@
 <div class="header">
   <h1>HITSTER<span>+</span></h1>
   <div class="subtitle">Erweiterungsset &middot; 30 Karten</div>
+  <div class="build-info" id="buildInfo">Version: …</div>
 </div>
 
 <div class="content">
@@ -147,6 +149,10 @@
     <div style="display:flex;gap:10px;width:100%;max-width:300px;justify-content:center;margin-top:8px">
       <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="toggleDebug()">Debug-Log</button>
       <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="exportLog()">Log exportieren</button>
+    </div>
+    <div style="display:flex;gap:10px;width:100%;max-width:300px;justify-content:center;margin-top:8px">
+      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="copyLog()">Log kopieren</button>
+      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="clearLog()">Log leeren</button>
     </div>
     <button class="btn btn-small" style="background:none;color:var(--text-dim);margin-top:8px" onclick="spotifyLogout()">
       Spotify trennen
@@ -290,6 +296,18 @@ function getEnvInfo() {
   };
 }
 
+function formatBuildInfo(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const y = date.getFullYear();
+  const m = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  const ss = pad(date.getSeconds());
+  const version = `v${y}${m}${d}-${hh}${mm}`;
+  return { version, builtAt: `${y}-${m}-${d} ${hh}:${mm}:${ss}` };
+}
+
 async function fetchWithTimeout(url, opts, timeoutMs = 9000) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
@@ -338,6 +356,34 @@ function exportLog() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function copyLog() {
+  let payload = { env: getEnvInfo(), entries: [] };
+  try {
+    const raw = localStorage.getItem(LOG_KEY);
+    payload.entries = raw ? JSON.parse(raw) : [];
+  } catch {}
+  const text = safeJsonStringify(payload);
+
+  try {
+    await navigator.clipboard.writeText(text);
+    alert('Log in Zwischenablage kopiert.');
+    log('Log kopiert', 'info', { bytes: text.length });
+  } catch (e) {
+    // Fallback for iOS/Safari edge cases
+    log('Clipboard nicht verfügbar, Fallback prompt', 'warn', { message: String(e?.message || e) });
+    prompt('Kopiere das Log:', text);
+  }
+}
+
+function clearLog() {
+  try { localStorage.removeItem(LOG_KEY); } catch {}
+  ['debugLog','debugLogScan','debugLogSetup','debugLogPlay','debugLogDevices'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+  log('Log geleert', 'info');
 }
 
 function toggleDebug() { setDebugVisible(!debugEnabled); }
@@ -643,7 +689,13 @@ async function startPlayback(spotifyTrackId) {
   const devices = await getDevices(2);
   const preferred = preferredDeviceId ? devices.find(d => d.id === preferredDeviceId) : null;
   const active = devices.find(d => d.is_active);
-  const chosen = preferred || active || devices[0] || null;
+  let chosen = preferred || active || devices[0] || null;
+
+  // Critical improvement: if devices endpoint is temporarily empty, still try the saved preferred device_id
+  if (!chosen && preferredDeviceId) {
+    chosen = { id: preferredDeviceId, name: 'Gespeichertes Zielgerät', type: 'saved', is_active: false, volume_percent: null, __saved: true };
+    log('Geräteliste leer – nutze gespeichertes Zielgerät trotzdem', 'warn', { preferredDeviceId });
+  }
 
   if (!chosen) {
     showPlayError('Kein Spotify-Gerät gefunden. Öffne Spotify auf einem Gerät, starte kurz einen Song und aktualisiere dann die Geräte.', { lastSpotifyError });
@@ -714,28 +766,50 @@ function setPreferredDevice(id) {
     else localStorage.removeItem(DEVICE_KEY);
   } catch(e) {}
   log('Bevorzugtes Gerät gesetzt', 'info', { preferredDeviceId });
+  updateSpotifyBadge();
   // re-render marker
   refreshDevices(1);
 }
 
+function updateSpotifyBadge() {
+  const el = document.getElementById('spotifyUserBadge');
+  if (!el) return;
+  if (!spotifyToken) {
+    el.innerHTML = '&#9679; Spotify nicht verbunden';
+    el.style.color = 'var(--text-dim)';
+    return;
+  }
+  const deviceTxt = preferredDeviceId ? (' &middot; Zielger&auml;t: ' + preferredDeviceId.slice(0, 6) + '…') : '';
+  el.innerHTML = '&#9679; Spotify verbunden' + deviceTxt;
+  el.style.color = '#1DB954';
+}
+
 function renderDevices(devices) {
   const grid = document.getElementById('deviceGrid');
-  if (!devices || devices.length === 0) {
+  const list = Array.isArray(devices) ? devices.slice() : [];
+
+  // If we have a preferred device id but it is currently not listed, show it as "saved"
+  if (preferredDeviceId && !list.some(d => d && d.id === preferredDeviceId)) {
+    list.unshift({ id: preferredDeviceId, name: 'Gespeichertes Zielgerät (derzeit nicht sichtbar)', type: 'saved', is_active: false, volume_percent: null, __saved: true });
+  }
+
+  if (!list.length) {
     grid.innerHTML = `<div class="error-msg">Keine Geräte sichtbar. Öffne Spotify auf einem Gerät, starte kurz einen Song und aktualisiere.</div>`;
     return;
   }
 
-  const html = devices.map(d => {
+  const html = list.map(d => {
     const isPref = preferredDeviceId && d.id === preferredDeviceId;
     const badge = d.is_active ? 'AKTIV' : (isPref ? 'ZIEL' : '');
     const badgeStyle = d.is_active ? 'background:rgba(74,222,128,0.15);color:var(--success);' : (isPref ? 'background:rgba(233,69,96,0.15);color:var(--accent);' : 'color:var(--text-dim);');
     const safeId = String(d.id || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const sub = d.__saved ? 'gespeichert · tippen um zu behalten' : `${d.type}${d.volume_percent !== null ? ' · Vol ' + d.volume_percent + '%' : ''}`;
     return `
       <div class="song-item" style="cursor:pointer" onclick="setPreferredDevice('${safeId}')">
         <div class="song-num">${d.is_active ? '●' : '○'}</div>
         <div style="flex:1">
           <div class="song-title">${d.name}</div>
-          <div class="song-artist">${d.type}${d.volume_percent !== null ? ' · Vol ' + d.volume_percent + '%' : ''}</div>
+          <div class="song-artist">${sub}</div>
         </div>
         <div class="song-year" style="${badgeStyle}">${badge || '&nbsp;'}</div>
       </div>`;
@@ -747,6 +821,7 @@ async function refreshDevices(retries = 2) {
   document.getElementById('deviceGrid').innerHTML = '';
   const devices = await getDevices(retries);
   renderDevices(devices);
+  updateSpotifyBadge();
 }
 
 // ══════════════════════════════════════════════
@@ -967,7 +1042,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dbg === '0') debugEnabled = false;
   } catch(e) {}
   setDebugVisible(debugEnabled);
+  try {
+    const lm = new Date(document.lastModified);
+    const dt = isNaN(lm.getTime()) ? new Date() : lm;
+    const info = formatBuildInfo(dt);
+    const el = document.getElementById('buildInfo');
+    if (el) el.textContent = `Version: ${info.version} · gebaut: ${info.builtAt}`;
+    log('Build-Info', 'info', info);
+  } catch(e) {}
   log('App gestartet', 'info', getEnvInfo());
+  updateSpotifyBadge();
   init();
 });
 
