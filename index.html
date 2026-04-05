@@ -123,21 +123,11 @@
 
 <div class="content">
 
-  <!-- SETUP: Spotify App einrichten -->
+  <!-- SETUP: Spotify Login -->
   <div id="screen-setup" class="screen">
     <div class="home-icon" style="font-size:36px">&#127925;</div>
-    <div class="setup-box">
-      <h3>Spotify verbinden (einmalig)</h3>
-      <ol>
-        <li>&#214;ffne <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--accent)">developer.spotify.com/dashboard</a></li>
-        <li>Erstelle eine neue App (Name: <code>Hitster+</code>)</li>
-        <li>Redirect URI: <code>https://phildah2.github.io/hitster/</code></li>
-        <li>Bei &quot;Which API/SDKs are you planning to use?&quot; w&auml;hle <b>Web API</b></li>
-        <li>Kopiere die <b>Client ID</b> und f&uuml;ge sie hier ein:</li>
-      </ol>
-      <input type="text" id="clientIdInput" placeholder="Client ID eingeben..." autocomplete="off">
-    </div>
-    <button class="btn btn-spotify" onclick="saveClientIdAndLogin()">&#9654; Mit Spotify verbinden</button>
+    <div class="home-text">Verbinde dein Spotify Premium-Konto, damit die Musik automatisch abgespielt werden kann.</div>
+    <button class="btn btn-spotify" onclick="startSpotifyLogin(SPOTIFY_CLIENT_ID)">&#9654; Mit Spotify verbinden</button>
     <div id="setupError" class="error-msg" style="display:none"></div>
     <div class="debug-log" id="debugLogSetup"></div>
   </div>
@@ -239,7 +229,8 @@ let scanner = null;
 let isScanning = false;
 let scanProcessing = false;
 let spotifyToken = null;
-let spotifyClientId = null;
+const SPOTIFY_CLIENT_ID = '818547f9235c471da830c418b8bea2e8';
+let spotifyClientId = SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = window.location.origin + window.location.pathname;
 const SCOPES = 'user-modify-playback-state user-read-playback-state';
 
@@ -280,9 +271,9 @@ function base64urlencode(buffer) {
 }
 
 async function startSpotifyLogin(clientId) {
-  spotifyClientId = clientId;
+  spotifyClientId = clientId || SPOTIFY_CLIENT_ID;
   // Save client ID for after redirect
-  try { sessionStorage.setItem('hitster_client_id', clientId); } catch(e) {}
+  try { sessionStorage.setItem('hitster_client_id', spotifyClientId); } catch(e) {}
 
   const codeVerifier = generateRandomString(64);
   try { sessionStorage.setItem('hitster_code_verifier', codeVerifier); } catch(e) {}
@@ -400,16 +391,7 @@ async function refreshToken() {
   return false;
 }
 
-function saveClientIdAndLogin() {
-  const input = document.getElementById('clientIdInput');
-  const clientId = input.value.trim();
-  if (!clientId || clientId.length < 10) {
-    document.getElementById('setupError').textContent = 'Bitte gültige Client ID eingeben.';
-    document.getElementById('setupError').style.display = '';
-    return;
-  }
-  startSpotifyLogin(clientId);
-}
+// Client ID ist hardcoded, kein Eingabefeld nötig
 
 function spotifyLogout() {
   spotifyToken = null;
@@ -461,17 +443,32 @@ async function spotifyApi(endpoint, method = 'GET', body = null) {
   return await resp.json().catch(() => ({}));
 }
 
-async function getActiveDevice() {
-  const data = await spotifyApi('/me/player/devices');
-  if (!data || !data.devices || data.devices.length === 0) {
-    log('Keine Spotify-Geräte gefunden. Öffne Spotify auf deinem Handy.', 'warn');
-    return null;
+async function getActiveDevice(retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    log('Suche Spotify-Geräte (Versuch ' + attempt + '/' + retries + ')...', 'info');
+    const data = await spotifyApi('/me/player/devices');
+    if (data && data.devices && data.devices.length > 0) {
+      const active = data.devices.find(d => d.is_active);
+      const device = active || data.devices[0];
+      log('Gerät gefunden: ' + device.name + ' (' + device.type + ')', 'info');
+      return device;
+    }
+    if (attempt < retries) {
+      log('Noch keine Geräte, warte 2s...', 'warn');
+      await new Promise(r => setTimeout(r, 2000));
+    }
   }
-  // Prefer active device, otherwise first one
-  const active = data.devices.find(d => d.is_active);
-  const device = active || data.devices[0];
-  log('Gerät: ' + device.name + ' (' + device.type + ')', 'info');
-  return device;
+
+  // Last resort: try to get current playback state (sometimes devices endpoint is empty but player works)
+  log('Versuche direkten Player-Zugriff...', 'info');
+  const playerState = await spotifyApi('/me/player');
+  if (playerState && playerState.device) {
+    log('Gerät via Player gefunden: ' + playerState.device.name, 'info');
+    return playerState.device;
+  }
+
+  log('Keine Spotify-Geräte nach ' + retries + ' Versuchen.', 'err');
+  return null;
 }
 
 async function startPlayback(spotifyTrackId) {
@@ -479,7 +476,7 @@ async function startPlayback(spotifyTrackId) {
 
   if (!device) {
     document.getElementById('playError').textContent =
-      'Kein aktives Spotify-Gerät gefunden. Öffne die Spotify-App auf deinem Handy und spiele kurz irgendetwas ab, dann versuche es erneut.';
+      'Kein Spotify-Gerät gefunden. Öffne die Spotify-App, spiele kurz etwas ab, und versuche es dann erneut.';
     document.getElementById('playError').style.display = '';
     return false;
   }
