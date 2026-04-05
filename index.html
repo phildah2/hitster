@@ -561,6 +561,24 @@ function showCountdown(callback) {
 // ══════════════════════════════════════════════════════
 // SONG LIST (for game master / after game)
 // ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+// AUTO-PLAY FROM URL PARAMETER (?card=01)
+// ══════════════════════════════════════════════════════
+function checkUrlParam() {
+  const params = new URLSearchParams(window.location.search);
+  const cardParam = params.get('card');
+  if (cardParam) {
+    const cardNum = parseInt(cardParam);
+    if (cardNum >= 1 && cardNum <= 30) {
+      // Clean URL so refreshing doesn't re-trigger
+      window.history.replaceState({}, '', window.location.pathname);
+      // Small delay to let page render
+      setTimeout(() => playSong(cardNum), 300);
+    }
+  }
+}
+document.addEventListener('DOMContentLoaded', checkUrlParam);
+
 function showSongList() {
   const grid = document.getElementById('songGrid');
   grid.innerHTML = SONGS.map(s => `
