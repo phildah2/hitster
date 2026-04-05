@@ -228,6 +228,15 @@
           </div>
 
           <button class="btn btn-small subtle-link-btn" onclick="spotifyLogout()">Spotify trennen</button>
+
+          <div class="or-divider" style="margin-top:2px">Playback</div>
+          <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;color:rgba(255,255,255,0.85);font-weight:700">
+            <span>Keep‑Alive bei Stopp</span>
+            <input id="keepAliveToggle" type="checkbox" style="transform:scale(1.2)" onchange="setKeepAlive(this.checked)">
+          </label>
+          <div style="font-size:12px;color:rgba(255,255,255,0.55);line-height:1.35">
+            H&auml;lt Spotify auf dem iPhone aktiv (stumm), damit Play beim n&auml;chsten Scan seltener scheitert.
+          </div>
         </div>
       </details>
     </div>
@@ -376,6 +385,10 @@ let preferredDeviceId = null;
 let preferredDeviceName = null;
 let lastGoodDeviceId = null;
 let lastGoodDeviceName = null;
+let keepAliveEnabled = true;
+let keepAliveArmed = false;
+let keepAlivePrevVolume = null;
+let keepAliveDeviceId = null;
 let debugEnabled = true;
 let lastSpotifyError = null;
 const LOG_KEY = 'hitster_log_v1';
@@ -384,6 +397,12 @@ const DEVICE_KEY = 'hitster_preferred_device_v1';
 const DEVICE_NAME_KEY = 'hitster_preferred_device_name_v1';
 const LAST_DEVICE_KEY = 'hitster_last_device_v1';
 const LAST_DEVICE_NAME_KEY = 'hitster_last_device_name_v1';
+const KEEP_ALIVE_KEY = 'hitster_keep_alive_v1';
+const KEEP_ALIVE_VOL_KEY = 'hitster_keep_alive_prev_vol_v1';
+const KEEP_ALIVE_DEVICE_KEY = 'hitster_keep_alive_device_v1';
+
+// Neutraler "Silence"-Track (nicht Teil des Spiels)
+const KEEP_ALIVE_TRACK_ID = '2bNCdW4rLnCTzgqUXTTDO1'; // John Cage – 4'33''
 
 // ══════════════════════════════════════════════
 // UTIL
@@ -711,6 +730,12 @@ function clearPlayError() {
   if (b) b.style.display = 'none';
 }
 
+function setKeepAlive(enabled) {
+  keepAliveEnabled = !!enabled;
+  try { localStorage.setItem(KEEP_ALIVE_KEY, keepAliveEnabled ? '1' : '0'); } catch(e) {}
+  log('Keep-Alive ' + (keepAliveEnabled ? 'aktiviert' : 'deaktiviert'), 'info');
+}
+
 async function spotifyApi(endpoint, method = 'GET', body = null, options = {}) {
   if (!spotifyToken) { log('Kein Token', 'err'); return null; }
   const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 9000;
@@ -768,6 +793,21 @@ async function spotifyApi(endpoint, method = 'GET', body = null, options = {}) {
     return null;
   }
   return data;
+}
+
+async function tryRestoreVolumeIfNeeded() {
+  if (!keepAliveEnabled || !keepAliveArmed) return;
+  if (!keepAliveDeviceId) return;
+  if (typeof keepAlivePrevVolume !== 'number') return;
+  if (keepAlivePrevVolume < 1) return;
+
+  log('Restore Volume', 'info', { device: keepAliveDeviceId, volume: keepAlivePrevVolume });
+  await spotifyApi('/me/player/volume?volume_percent=' + encodeURIComponent(String(keepAlivePrevVolume)) + '&device_id=' + encodeURIComponent(keepAliveDeviceId), 'PUT');
+  keepAliveArmed = false;
+  try {
+    localStorage.removeItem(KEEP_ALIVE_VOL_KEY);
+    localStorage.removeItem(KEEP_ALIVE_DEVICE_KEY);
+  } catch(e) {}
 }
 
 function normalizeDevice(d) {
@@ -849,6 +889,7 @@ async function getDevices(retries = 3) {
 
 async function startPlayback(spotifyTrackId) {
   clearPlayError();
+  await tryRestoreVolumeIfNeeded();
 
   const trackBody = { uris: ['spotify:track:' + spotifyTrackId], position_ms: 0 };
 
@@ -965,8 +1006,48 @@ async function verifyPlayback(expectedDevice, trackId = null) {
 }
 
 async function stopPlayback() {
-  await spotifyApi('/me/player/pause', 'PUT');
-  log('Wiedergabe pausiert', 'info');
+  if (!keepAliveEnabled) {
+    await spotifyApi('/me/player/pause', 'PUT');
+    log('Wiedergabe pausiert', 'info');
+    showHome();
+    return;
+  }
+
+  // Keep-Alive strategy: set volume to 0 and play a neutral silent track,
+  // so Spotify keeps an active player and we can start the next song reliably.
+  log('Keep-Alive: aktiviere stummen Player...', 'info');
+
+  // Determine device to keep alive (prefer iPhone)
+  const devices = await getDevices(1);
+  const dev = pickBestDevice(devices) || devices[0] || null;
+  const deviceId = dev?.id || preferredDeviceId || lastGoodDeviceId || null;
+  keepAliveDeviceId = deviceId;
+
+  // Try remember previous volume from device list
+  if (dev && typeof dev.volume_percent === 'number') {
+    keepAlivePrevVolume = dev.volume_percent;
+  } else if (typeof keepAlivePrevVolume !== 'number') {
+    keepAlivePrevVolume = 100;
+  }
+  try {
+    localStorage.setItem(KEEP_ALIVE_VOL_KEY, String(keepAlivePrevVolume));
+    if (keepAliveDeviceId) localStorage.setItem(KEEP_ALIVE_DEVICE_KEY, keepAliveDeviceId);
+  } catch(e) {}
+
+  if (deviceId) {
+    // Set volume 0 on the device, then play silent track
+    await spotifyApi('/me/player/volume?volume_percent=0&device_id=' + encodeURIComponent(deviceId), 'PUT');
+    const ok = await spotifyApi('/me/player/play?device_id=' + encodeURIComponent(deviceId), 'PUT', { uris: ['spotify:track:' + KEEP_ALIVE_TRACK_ID], position_ms: 0 });
+    if (ok !== null) {
+      keepAliveArmed = true;
+      log('Keep-Alive aktiv (stumm)', 'info', { deviceId });
+    } else {
+      log('Keep-Alive fehlgeschlagen', 'warn', { lastSpotifyError });
+    }
+  } else {
+    log('Keep-Alive: kein device_id verfügbar', 'warn');
+  }
+
   showHome();
 }
 
@@ -999,8 +1080,8 @@ function openSpotifyApp() {
   // Goal: make Spotify Connect "active" again on iOS.
   // Opening open.spotify.com often bounces back to the browser; deep links are less annoying.
   // We open a neutral, non-game context where the user can tap Play once.
-  const deepLink = 'spotify:search:one%20second%20silence';
-  log('Öffne Spotify (Suche: one second silence)...', 'info', { deepLink });
+  const deepLink = 'spotify:track:' + KEEP_ALIVE_TRACK_ID;
+  log('Öffne Spotify (Stille-Track)...', 'info', { deepLink });
 
   let didHide = false;
   const onVis = () => { if (document.visibilityState === 'hidden') didHide = true; };
@@ -1020,7 +1101,7 @@ function openSpotifyApp() {
       return;
     }
     log('Spotify-App nicht geöffnet, nutze Web-Fallback...', 'warn');
-    try { window.open('https://open.spotify.com/search/one%20second%20silence', '_blank'); } catch(e) {}
+    try { window.open('https://open.spotify.com/track/' + KEEP_ALIVE_TRACK_ID, '_blank'); } catch(e) {}
   }, 1500);
 }
 
@@ -1416,10 +1497,19 @@ document.addEventListener('DOMContentLoaded', () => {
     preferredDeviceName = localStorage.getItem(DEVICE_NAME_KEY);
     lastGoodDeviceId = localStorage.getItem(LAST_DEVICE_KEY);
     lastGoodDeviceName = localStorage.getItem(LAST_DEVICE_NAME_KEY);
+    const ka = localStorage.getItem(KEEP_ALIVE_KEY);
+    if (ka === '0') keepAliveEnabled = false;
+    const kav = localStorage.getItem(KEEP_ALIVE_VOL_KEY);
+    if (kav !== null && kav !== undefined && kav !== '') keepAlivePrevVolume = parseInt(kav, 10);
+    keepAliveDeviceId = localStorage.getItem(KEEP_ALIVE_DEVICE_KEY);
     const dbg = localStorage.getItem(DEBUG_KEY);
     if (dbg === '0') debugEnabled = false;
   } catch(e) {}
   setDebugVisible(debugEnabled);
+  try {
+    const t = document.getElementById('keepAliveToggle');
+    if (t) t.checked = !!keepAliveEnabled;
+  } catch(e) {}
   try {
     const lm = new Date(document.lastModified);
     const dt = isNaN(lm.getTime()) ? new Date() : lm;
