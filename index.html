@@ -951,8 +951,32 @@ function nextCard() {
 }
 
 function openSpotifyApp() {
-  log('Öffne Spotify (falls installiert)...', 'info');
-  try { window.open('https://open.spotify.com', '_blank'); } catch(e) {}
+  // iOS: opening https://open.spotify.com often "bounces" to the app and back to the browser.
+  // We therefore try a deep link first and only fall back to the web player if the app did not open.
+  log('Öffne Spotify-App...', 'info');
+
+  let didHide = false;
+  const onVis = () => { if (document.visibilityState === 'hidden') didHide = true; };
+  document.addEventListener('visibilitychange', onVis, { once: true });
+
+  // Try deep link (works when app is installed)
+  try {
+    // Use a URI that reliably opens the app without forcing a browser tab.
+    window.location.href = 'spotify:app';
+  } catch(e) {
+    log('Deep-Link fehlgeschlagen', 'warn', { message: String(e?.message || e) });
+  }
+
+  // Fallback: only open web if app did NOT open (page never went hidden)
+  setTimeout(() => {
+    try { document.removeEventListener('visibilitychange', onVis); } catch {}
+    if (didHide) {
+      log('Spotify-App geöffnet (kein Web-Fallback).', 'info');
+      return;
+    }
+    log('Spotify-App nicht geöffnet, nutze Web-Fallback...', 'warn');
+    try { window.open('https://open.spotify.com', '_blank'); } catch(e) {}
+  }, 1500);
 }
 
 function openDevicePanel() {
