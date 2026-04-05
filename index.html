@@ -39,6 +39,28 @@
     font-size: 48px; box-shadow: 0 10px 40px rgba(233,69,96,0.3);
   }
   .home-text { font-size: 15px; color: var(--text-dim); line-height: 1.5; padding: 0 16px; }
+  .more-panel { width: 100%; max-width: 380px; }
+  details.more {
+    width: 100%;
+    background: rgba(0,0,0,0.15);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  details.more summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 14px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+  }
+  details.more summary::-webkit-details-marker { display: none; }
+  details.more .more-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .subtle-link-btn { background:none; color: var(--text-dim); }
 
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 10px;
@@ -138,25 +160,39 @@
   <div id="screen-home" class="screen">
     <div class="spotify-badge" id="spotifyUserBadge">&#9679; Spotify verbunden</div>
     <div class="home-icon">&#127925;</div>
-    <div class="home-text">Scanne den QR-Code oder gib die Kartennummer ein.</div>
-    <button class="btn btn-primary" onclick="startScanner()">&#128247; QR-Code scannen</button>
-    <button class="btn btn-secondary btn-small" onclick="openDevicePanel()">&#128266; Spotify-Ger&auml;te</button>
-    <div class="or-divider">oder</div>
-    <div class="manual-input-row">
-      <input type="number" id="manualInput" min="1" max="30" placeholder="Nr." inputmode="numeric">
-      <button class="btn btn-secondary btn-small" onclick="playManual()">&#9654; Play</button>
+    <div class="home-text">Tippe auf „N&auml;chste Karte“ und scanne den QR-Code.</div>
+    <button class="btn btn-primary" onclick="startScanner()">&#128247; N&auml;chste Karte</button>
+
+    <div class="more-panel">
+      <details class="more">
+        <summary>
+          <span>Optionen</span>
+          <span style="color:rgba(255,255,255,0.5);font-weight:800">+</span>
+        </summary>
+        <div class="more-body">
+          <div class="or-divider" style="margin-top:2px">Manuell</div>
+          <div class="manual-input-row">
+            <input type="number" id="manualInput" min="1" max="30" placeholder="Nr." inputmode="numeric">
+            <button class="btn btn-secondary btn-small" onclick="playManual()">&#9654; Play</button>
+          </div>
+
+          <button class="btn btn-secondary btn-small" onclick="openDevicePanel()">&#128266; Spotify-Ger&auml;te</button>
+
+          <div class="or-divider" style="margin-top:2px">Debug</div>
+          <div style="display:flex;gap:10px;width:100%;justify-content:center">
+            <button class="btn btn-small btn-secondary" style="max-width:170px" onclick="toggleDebug()">Debug-Log</button>
+            <button class="btn btn-small btn-secondary" style="max-width:170px" onclick="exportLog()">Export</button>
+          </div>
+          <div style="display:flex;gap:10px;width:100%;justify-content:center">
+            <button class="btn btn-small btn-secondary" style="max-width:170px" onclick="copyLog()">Kopieren</button>
+            <button class="btn btn-small btn-secondary" style="max-width:170px" onclick="clearLog()">Leeren</button>
+          </div>
+
+          <button class="btn btn-small subtle-link-btn" onclick="spotifyLogout()">Spotify trennen</button>
+        </div>
+      </details>
     </div>
-    <div style="display:flex;gap:10px;width:100%;max-width:300px;justify-content:center;margin-top:8px">
-      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="toggleDebug()">Debug-Log</button>
-      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="exportLog()">Log exportieren</button>
-    </div>
-    <div style="display:flex;gap:10px;width:100%;max-width:300px;justify-content:center;margin-top:8px">
-      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="copyLog()">Log kopieren</button>
-      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="clearLog()">Log leeren</button>
-    </div>
-    <button class="btn btn-small" style="background:none;color:var(--text-dim);margin-top:8px" onclick="spotifyLogout()">
-      Spotify trennen
-    </button>
+
     <div class="debug-log" id="debugLog"></div>
   </div>
 
@@ -178,14 +214,12 @@
     <div id="playingDeviceInfo" style="font-size:12px;color:var(--text-dim);max-width:340px;text-align:center"></div>
     <div class="playing-status"><div class="pulse-dot"></div> Wird abgespielt...</div>
     <div id="playError" class="error-msg" style="display:none"></div>
-    <button class="btn btn-primary" onclick="showHome()" style="margin-top:8px">&#127912; N&auml;chste Karte</button>
-    <button class="btn btn-secondary btn-small" onclick="openDevicePanel()">&#128266; Ger&auml;te</button>
-    <button class="btn btn-small" style="background:none;color:var(--text-dim)" onclick="stopPlayback()">
-      &#9724; Stopp
-    </button>
-    <button class="btn btn-small" style="background:none;color:var(--text-dim)" onclick="showSongList()">
-      &#128065; Alle Songs (Spoiler!)
-    </button>
+    <button class="btn btn-primary" onclick="nextCard()" style="margin-top:8px">&#127912; N&auml;chste Karte</button>
+    <div style="display:flex;gap:10px;width:100%;max-width:300px;justify-content:center">
+      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="openDevicePanel()">&#128266; Ger&auml;te</button>
+      <button class="btn btn-small btn-secondary" style="max-width:145px" onclick="showSongList()">&#128065; Songs</button>
+    </div>
+    <button class="btn btn-small subtle-link-btn" onclick="stopPlayback()">&#9724; Stopp</button>
     <div class="debug-log" id="debugLogPlay"></div>
   </div>
 
@@ -809,6 +843,13 @@ function showHome() {
   document.getElementById('manualInput').value = '';
   const info = document.getElementById('playingDeviceInfo');
   if (info) info.textContent = '';
+}
+
+function nextCard() {
+  // Primary flow: go straight into scanning the next card
+  if (isScanning) stopScanner();
+  scanProcessing = false;
+  startScanner();
 }
 
 function openSpotifyApp() {
