@@ -704,6 +704,28 @@ function normalizeDevice(d) {
   };
 }
 
+function isWebPlayerDevice(dev) {
+  const name = String(dev?.name || '').toLowerCase();
+  const type = String(dev?.type || '').toLowerCase();
+  return name.includes('web player') || name.includes('webplayer') || type.includes('computer');
+}
+
+function pickBestDevice(devices) {
+  const list = Array.isArray(devices) ? devices.filter(Boolean) : [];
+  if (!list.length) return null;
+
+  // Prefer active non-web-player devices (usually the phone)
+  const activeNonWeb = list.find(d => d.is_active && !isWebPlayerDevice(d));
+  if (activeNonWeb) return activeNonWeb;
+
+  // Prefer devices that look like the iPhone / smartphone
+  const iphoneByName = list.find(d => /iphone/i.test(d.name));
+  if (iphoneByName) return iphoneByName;
+
+  const active = list.find(d => d.is_active);
+  return active || list[0];
+}
+
 async function getDevices(retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     log('Lade Spotify-Geräte (Versuch ' + attempt + '/' + retries + ')...', 'info');
@@ -718,6 +740,10 @@ async function getDevices(retries = 3) {
 
   // Fallback: /me/player returns 204 if no active device; otherwise includes device
   const player = await spotifyApi('/me/player');
+  if (player && player.__status === 204) {
+    log('Spotify Player: kein aktives Gerät (204)', 'warn');
+    return [];
+  }
   if (player && player.device) {
     const dev = normalizeDevice(player.device);
     if (dev) return [dev];
@@ -733,14 +759,13 @@ async function startPlayback(spotifyTrackId) {
 
   const devices = await getDevices(2);
   const preferred = preferredDeviceId ? devices.find(d => d.id === preferredDeviceId) : null;
-  const active = devices.find(d => d.is_active);
 
   // If user selected a preferred device, do NOT fall back to random other devices (e.g. Mobile Web Player)
   let chosen = null;
   if (preferredDeviceId) {
     chosen = preferred || { id: preferredDeviceId, name: preferredDeviceName || 'Gespeichertes Zielgerät', type: 'saved', is_active: false, volume_percent: null, __saved: true };
   } else {
-    chosen = active || devices[0] || null;
+    chosen = pickBestDevice(devices);
   }
 
   // Critical improvement: if devices endpoint is temporarily empty, still try the saved preferred device_id
@@ -765,8 +790,8 @@ async function startPlayback(spotifyTrackId) {
     log('Play auf Gerät: ' + chosen.name, 'info');
     const result = await spotifyApi('/me/player/play?device_id=' + encodeURIComponent(chosen.id), 'PUT', trackBody);
     if (result !== null) {
-      log('Wiedergabe gestartet', 'info');
-      await verifyPlayback(chosen);
+      log('Play-Befehl gesendet', 'info', { device: chosen.name });
+      await verifyPlayback(chosen, spotifyTrackId);
       return true;
     }
   }
@@ -780,8 +805,8 @@ async function startPlayback(spotifyTrackId) {
   log('Fallback: Play ohne device_id...', 'warn');
   const r2 = await spotifyApi('/me/player/play', 'PUT', trackBody);
   if (r2 !== null) {
-    log('Wiedergabe gestartet (auto device)', 'info');
-    await verifyPlayback(null);
+    log('Play-Befehl gesendet (auto device)', 'info');
+    await verifyPlayback(null, spotifyTrackId);
     return true;
   }
 
@@ -789,36 +814,50 @@ async function startPlayback(spotifyTrackId) {
   return false;
 }
 
-async function verifyPlayback(expectedDevice) {
+async function verifyPlayback(expectedDevice, trackId = null) {
   const el = document.getElementById('playingDeviceInfo');
   if (el) el.textContent = 'Prüfe Spotify-Status...';
 
-  const state = await spotifyApi('/me/player');
-  if (state && state.__status === 204) {
-    if (el) el.textContent = 'Spotify meldet: kein aktives Gerät / keine laufende Wiedergabe.';
-    log('Playback-Status: 204 (kein aktiver Player)', 'warn');
-    return;
-  }
-  if (!state) {
-    if (el) el.textContent = 'Spotify-Status konnte nicht gelesen werden (siehe Log).';
-    return;
+  // Poll a few times: Spotify sometimes reports is_playing=false right after play.
+  const attempts = 5;
+  for (let i = 1; i <= attempts; i++) {
+    const state = await spotifyApi('/me/player');
+    if (state && state.__status === 204) {
+      if (el) el.textContent = 'Spotify meldet: kein aktives Gerät / keine laufende Wiedergabe.';
+      log('Playback-Status: 204 (kein aktiver Player)', 'warn');
+      if (i < attempts) await new Promise(r => setTimeout(r, 350));
+      continue;
+    }
+    if (!state) {
+      if (el) el.textContent = 'Spotify-Status konnte nicht gelesen werden (siehe Log).';
+      return;
+    }
+
+    const dev = state.device ? normalizeDevice(state.device) : null;
+    const isPlaying = !!state.is_playing;
+    const devName = dev?.name || 'unbekannt';
+    const devId = dev?.id || null;
+    const item = state.item ? { id: state.item.id, name: state.item.name, artists: (state.item.artists || []).map(a => a.name).join(', ') } : null;
+
+    if (el) {
+      const txt = `Gerät: ${devName}${isPlaying ? ' · spielt' : ' · pausiert'}${item ? ` · Track: ${item.name}` : ''}`;
+      el.textContent = txt;
+    }
+    log('Playback-Status', 'info', { attempt: i, isPlaying, device: dev, item });
+
+    if (expectedDevice?.id && devId && expectedDevice.id !== devId) {
+      showPlayError('Es spielt auf einem anderen Gerät: ' + devName + '. Wähle im Geräte-Menü dein iPhone als Zielgerät.', { expectedDevice, actualDevice: dev });
+      return;
+    }
+    if (trackId && item?.id && item.id !== trackId) {
+      log('Hinweis: anderes Track-ID als erwartet', 'warn', { expected: trackId, actual: item.id });
+    }
+
+    if (isPlaying) return;
+    if (i < attempts) await new Promise(r => setTimeout(r, 350));
   }
 
-  const dev = state.device ? normalizeDevice(state.device) : null;
-  const isPlaying = !!state.is_playing;
-  const devName = dev?.name || 'unbekannt';
-  const devId = dev?.id || null;
-  const item = state.item ? { name: state.item.name, artists: (state.item.artists || []).map(a => a.name).join(', ') } : null;
-
-  if (el) {
-    const txt = `Gerät: ${devName}${isPlaying ? ' · spielt' : ' · pausiert'}${item ? ` · Track: ${item.name}` : ''}`;
-    el.textContent = txt;
-  }
-  log('Playback-Status', 'info', { isPlaying, device: dev, item });
-
-  if (expectedDevice?.id && devId && expectedDevice.id !== devId) {
-    showPlayError('Es spielt auf einem anderen Gerät: ' + devName + '. Wähle im Geräte-Menü dein iPhone als Zielgerät.', { expectedDevice, actualDevice: dev });
-  }
+  log('Playback-Status blieb pausiert nach Polling', 'warn');
 }
 
 async function stopPlayback() {
