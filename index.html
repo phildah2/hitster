@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Hitster+">
+<meta name="apple-mobile-web-app-title" content="SauerSong+">
 <meta name="theme-color" content="#1a1a2e">
-<title>Hitster+ Player</title>
+<title>SauerSong+ Player</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   :root {
@@ -168,7 +168,7 @@
 <body>
 
 <div class="header">
-  <h1>HITSTER<span>+</span></h1>
+  <h1>SAUERSONG<span>+</span></h1>
   <div class="subtitle">Erweiterungsset &middot; 180 Karten</div>
   <div class="build-info" id="buildInfo">Version: …</div>
 </div>
@@ -559,15 +559,15 @@ let debugEnabled = false;
 let lastSpotifyError = null;
 let spotifyProfile = null;
 let currentTrackSpotifyId = null;
-const LOG_KEY = 'hitster_log_v1';
-const DEBUG_KEY = 'hitster_debug_v1';
-const DEVICE_KEY = 'hitster_preferred_device_v1';
-const DEVICE_NAME_KEY = 'hitster_preferred_device_name_v1';
-const LAST_DEVICE_KEY = 'hitster_last_device_v1';
-const LAST_DEVICE_NAME_KEY = 'hitster_last_device_name_v1';
-const KEEP_ALIVE_KEY = 'hitster_keep_alive_v1';
-const KEEP_ALIVE_VOL_KEY = 'hitster_keep_alive_prev_vol_v1';
-const KEEP_ALIVE_DEVICE_KEY = 'hitster_keep_alive_device_v1';
+const LOG_KEY = 'sauersong_log_v1';
+const DEBUG_KEY = 'sauersong_debug_v1';
+const DEVICE_KEY = 'sauersong_preferred_device_v1';
+const DEVICE_NAME_KEY = 'sauersong_preferred_device_name_v1';
+const LAST_DEVICE_KEY = 'sauersong_last_device_v1';
+const LAST_DEVICE_NAME_KEY = 'sauersong_last_device_name_v1';
+const KEEP_ALIVE_KEY = 'sauersong_keep_alive_v1';
+const KEEP_ALIVE_VOL_KEY = 'sauersong_keep_alive_prev_vol_v1';
+const KEEP_ALIVE_DEVICE_KEY = 'sauersong_keep_alive_device_v1';
 
 // Neutraler "Silence"-Track (nicht Teil des Spiels)
 const KEEP_ALIVE_TRACK_ID = '2bNCdW4rLnCTzgqUXTTDO1'; // John Cage – 4'33''
@@ -651,7 +651,7 @@ function exportLog() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `hitster-log-${Date.now()}.json`;
+  a.download = `sauersong-log-${Date.now()}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -742,10 +742,10 @@ function base64urlencode(buffer) {
 async function startSpotifyLogin(clientId) {
   spotifyClientId = clientId || SPOTIFY_CLIENT_ID;
   // Save client ID for after redirect
-  try { sessionStorage.setItem('hitster_client_id', spotifyClientId); } catch(e) {}
+  try { sessionStorage.setItem('sauersong_client_id', spotifyClientId); } catch(e) {}
 
   const codeVerifier = generateRandomString(64);
-  try { sessionStorage.setItem('hitster_code_verifier', codeVerifier); } catch(e) {}
+  try { sessionStorage.setItem('sauersong_code_verifier', codeVerifier); } catch(e) {}
 
   const hashed = await sha256(codeVerifier);
   const codeChallenge = base64urlencode(hashed);
@@ -766,8 +766,8 @@ async function startSpotifyLogin(clientId) {
 async function handleSpotifyCallback(code) {
   let clientId, codeVerifier;
   try {
-    clientId = sessionStorage.getItem('hitster_client_id');
-    codeVerifier = sessionStorage.getItem('hitster_code_verifier');
+    clientId = sessionStorage.getItem('sauersong_client_id');
+    codeVerifier = sessionStorage.getItem('sauersong_code_verifier');
   } catch(e) {}
 
   if (!clientId || !codeVerifier) {
@@ -800,17 +800,17 @@ async function handleSpotifyCallback(code) {
 
       // Save refresh token
       try {
-        sessionStorage.setItem('hitster_token', data.access_token);
-        if (data.refresh_token) sessionStorage.setItem('hitster_refresh', data.refresh_token);
+        sessionStorage.setItem('sauersong_token', data.access_token);
+        if (data.refresh_token) sessionStorage.setItem('sauersong_refresh', data.refresh_token);
       } catch(e) {}
 
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
 
       // Check for pending card play
-      const pendingCard = sessionStorage.getItem('hitster_pending_card');
+      const pendingCard = sessionStorage.getItem('sauersong_pending_card');
       if (pendingCard) {
-        sessionStorage.removeItem('hitster_pending_card');
+        sessionStorage.removeItem('sauersong_pending_card');
         showScreen('screen-home');
         log('Spiele ausstehende Karte ' + pendingCard, 'info');
         playSong(parseInt(pendingCard));
@@ -825,7 +825,7 @@ async function handleSpotifyCallback(code) {
       // Clean URL (avoid repeated invalid_grant on refresh/back)
       window.history.replaceState({}, '', window.location.pathname);
       try {
-        sessionStorage.removeItem('hitster_code_verifier');
+        sessionStorage.removeItem('sauersong_code_verifier');
       } catch(e) {}
       showScreen('screen-setup');
     }
@@ -840,8 +840,8 @@ async function handleSpotifyCallback(code) {
 async function refreshToken() {
   let refreshTok, clientId;
   try {
-    refreshTok = sessionStorage.getItem('hitster_refresh');
-    clientId = sessionStorage.getItem('hitster_client_id');
+    refreshTok = sessionStorage.getItem('sauersong_refresh');
+    clientId = sessionStorage.getItem('sauersong_client_id');
   } catch(e) { return false; }
 
   if (!refreshTok || !clientId) return false;
@@ -860,8 +860,8 @@ async function refreshToken() {
     if (data.access_token) {
       spotifyToken = data.access_token;
       try {
-        sessionStorage.setItem('hitster_token', data.access_token);
-        if (data.refresh_token) sessionStorage.setItem('hitster_refresh', data.refresh_token);
+        sessionStorage.setItem('sauersong_token', data.access_token);
+        if (data.refresh_token) sessionStorage.setItem('sauersong_refresh', data.refresh_token);
       } catch(e) {}
       log('Token erneuert', 'info');
       return true;
@@ -875,9 +875,9 @@ async function refreshToken() {
 function spotifyLogout() {
   spotifyToken = null;
   try {
-    sessionStorage.removeItem('hitster_token');
-    sessionStorage.removeItem('hitster_refresh');
-    sessionStorage.removeItem('hitster_client_id');
+    sessionStorage.removeItem('sauersong_token');
+    sessionStorage.removeItem('sauersong_refresh');
+    sessionStorage.removeItem('sauersong_client_id');
     localStorage.removeItem(DEVICE_KEY);
   } catch(e) {}
   showScreen('screen-setup');
@@ -1691,7 +1691,7 @@ function extractCardNumber(raw) {
     const n = parseInt(m1[1], 10);
     if (n >= 1 && n <= 180) return n;
   }
-  const m2 = text.match(/(?:HITSTER|H\+|KARTE|CARD)[^\d]{0,10}(\d{1,3})/i);
+  const m2 = text.match(/(?:SAUERSONG|HITSTER|H\+|KARTE|CARD)[^\d]{0,10}(\d{1,3})/i);
   if (m2) {
     const n = parseInt(m2[1], 10);
     if (n >= 1 && n <= 180) return n;
@@ -1838,14 +1838,14 @@ async function init() {
     if (cardNum >= 1 && cardNum <= 180) {
       window.history.replaceState({}, '', window.location.pathname);
       // Save pending card for after login
-      try { sessionStorage.setItem('hitster_pending_card', cardNum.toString()); } catch(e) {}
+      try { sessionStorage.setItem('sauersong_pending_card', cardNum.toString()); } catch(e) {}
     }
   }
 
   // Try restore session
   try {
-    const savedToken = sessionStorage.getItem('hitster_token');
-    const savedClientId = sessionStorage.getItem('hitster_client_id');
+    const savedToken = sessionStorage.getItem('sauersong_token');
+    const savedClientId = sessionStorage.getItem('sauersong_client_id');
     if (savedToken && savedClientId) {
       spotifyToken = savedToken;
       spotifyClientId = savedClientId;
@@ -1855,9 +1855,9 @@ async function init() {
       fetchSpotifyProfile().finally(() => refreshDevices(1));
 
       // Check if there's a pending card
-      const pendingCard = sessionStorage.getItem('hitster_pending_card');
+      const pendingCard = sessionStorage.getItem('sauersong_pending_card');
       if (pendingCard) {
-        sessionStorage.removeItem('hitster_pending_card');
+        sessionStorage.removeItem('sauersong_pending_card');
         showScreen('screen-home');
         playSong(parseInt(pendingCard));
         return;
@@ -1898,7 +1898,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (t) t.checked = !!keepAliveEnabled;
   } catch(e) {}
   // Cleanup: removed spoiler feature
-  try { localStorage.removeItem('hitster_songinfo_v1'); } catch(e) {}
+  try { localStorage.removeItem('sauersong_songinfo_v1'); } catch(e) {}
   try {
     const lm = new Date(document.lastModified);
     const dt = isNaN(lm.getTime()) ? new Date() : lm;
